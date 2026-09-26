@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+pydantic
+python-dotenv
+openai
+requests
+pypdf
+python-docx
+python-pptx
+openpyxl
+pillow
+pytesseract
+pdf2image
