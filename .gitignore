@@ -1,0 +1,13 @@
+.env
+__pycache__/
+*.pyc
+documents/
+uploads/
+backend/uploads/
+*.db
+memory.json
+forgotten_memory.json
+*.pdf
+*.pdf.txt
+.venv/
+venv/

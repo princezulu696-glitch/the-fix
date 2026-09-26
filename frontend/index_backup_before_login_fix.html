@@ -1,0 +1,1300 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>The Fix</title>
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f4f6f8;
+            color: #222;
+        }
+
+        .header {
+            background: #111827;
+            color: white;
+            padding: 18px 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .username-display {
+            font-size: 14px;
+            color: #d1d5db;
+        }
+
+        .logout-button {
+            border: none;
+            background: #dc2626;
+            color: white;
+            padding: 8px 14px;
+            border-radius: 7px;
+            cursor: pointer;
+        }
+
+        .logout-button:hover {
+            background: #b91c1c;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+
+        .auth-card,
+        .chat-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+        }
+
+        .auth-card {
+            max-width: 450px;
+            margin: 60px auto;
+            padding: 30px;
+        }
+
+        .auth-card h2 {
+            margin-top: 0;
+            text-align: center;
+        }
+
+        .auth-card p {
+            text-align: center;
+            color: #666;
+        }
+
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            cursor: pointer;
+            background: #e5e7eb;
+        }
+
+        .tab:first-child {
+            border-radius: 7px 0 0 7px;
+        }
+
+        .tab:last-child {
+            border-radius: 0 7px 7px 0;
+        }
+
+        .tab.active {
+            background: #111827;
+            color: white;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: bold;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 11px;
+            border: 1px solid #ccc;
+            border-radius: 7px;
+            font-size: 15px;
+        }
+
+        .form-group input:focus,
+        #messageInput:focus {
+            outline: none;
+            border-color: #2563eb;
+        }
+
+        .primary-button {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            background: #2563eb;
+            color: white;
+            border-radius: 7px;
+            cursor: pointer;
+            font-size: 15px;
+        }
+
+        .primary-button:hover {
+            background: #1d4ed8;
+        }
+
+        .message {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 7px;
+            display: none;
+        }
+
+        .message.error {
+            display: block;
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .message.success {
+            display: block;
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .chat-card {
+            padding: 20px;
+        }
+
+        #chat {
+            height: 500px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            background: #fafafa;
+            margin-bottom: 15px;
+        }
+
+        .chat-message {
+            margin-bottom: 15px;
+            padding: 12px;
+            border-radius: 8px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+        }
+
+        .user-message {
+            background: #dbeafe;
+            margin-left: 15%;
+        }
+
+        .ai-message {
+            background: #e5e7eb;
+            margin-right: 15%;
+        }
+
+        .input-area {
+            display: flex;
+            gap: 10px;
+        }
+
+        #messageInput {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #ccc;
+            border-radius: 7px;
+            font-size: 15px;
+        }
+
+        .send-button {
+            padding: 12px 20px;
+            border: none;
+            background: #2563eb;
+            color: white;
+            border-radius: 7px;
+            cursor: pointer;
+        }
+
+        .send-button:hover {
+            background: #1d4ed8;
+        }
+
+        .upload-area {
+            margin-top: 15px;
+            padding: 15px;
+            border: 1px dashed #aaa;
+            border-radius: 8px;
+            background: #fafafa;
+        }
+
+        .upload-area input {
+            margin-right: 10px;
+        }
+
+        #uploadStatus {
+            margin-top: 10px;
+            font-size: 14px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        @media (max-width: 700px) {
+
+            .header {
+                padding: 15px;
+            }
+
+            .header h1 {
+                font-size: 20px;
+            }
+
+            .container {
+                margin: 15px auto;
+                padding: 0 10px;
+            }
+
+            .chat-card {
+                padding: 10px;
+            }
+
+            #chat {
+                height: 60vh;
+            }
+
+            .user-message {
+                margin-left: 5%;
+            }
+
+            .ai-message {
+                margin-right: 5%;
+            }
+
+            .input-area {
+                flex-direction: column;
+            }
+
+            .send-button {
+                width: 100%;
+            }
+
+            .upload-area .send-button {
+                width: auto;
+            }
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+    <div class="header">
+
+        <h1>🤖 The Fix</h1>
+
+        <div
+            id="accountArea"
+            class="header-right hidden"
+        >
+
+            <span
+                id="usernameDisplay"
+                class="username-display"
+            ></span>
+
+            <button
+                class="logout-button"
+                onclick="logout()"
+            >
+                Logout
+            </button>
+
+        </div>
+
+    </div>
+
+
+    <!-- AUTHENTICATION -->
+
+    <div
+        id="authSection"
+        class="container"
+    >
+
+        <div class="auth-card">
+
+            <div class="tabs">
+
+                <button
+                    id="loginTab"
+                    class="tab active"
+                    onclick="showLogin()"
+                >
+                    Login
+                </button>
+
+                <button
+                    id="registerTab"
+                    class="tab"
+                    onclick="showRegister()"
+                >
+                    Register
+                </button>
+
+            </div>
+
+
+            <!-- LOGIN -->
+
+            <div id="loginForm">
+
+                <h2>Welcome to The Fix</h2>
+
+                <p>Login to your account</p>
+
+                <div class="form-group">
+
+                    <label>Username</label>
+
+                    <input
+                        id="loginUsername"
+                        type="text"
+                        placeholder="Enter username"
+                        autocomplete="username"
+                    >
+
+                </div>
+
+
+                <div class="form-group">
+
+                    <label>Password</label>
+
+                    <input
+                        id="loginPassword"
+                        type="password"
+                        placeholder="Enter password"
+                        autocomplete="current-password"
+                    >
+
+                </div>
+
+
+                <button
+                    class="primary-button"
+                    onclick="login()"
+                >
+                    Login
+                </button>
+
+            </div>
+
+
+            <!-- REGISTER -->
+
+            <div
+                id="registerForm"
+                class="hidden"
+            >
+
+                <h2>Create Account</h2>
+
+                <p>Create your The Fix account</p>
+
+                <div class="form-group">
+
+                    <label>Username</label>
+
+                    <input
+                        id="registerUsername"
+                        type="text"
+                        placeholder="Choose a username"
+                        autocomplete="username"
+                    >
+
+                </div>
+
+
+                <div class="form-group">
+
+                    <label>Email</label>
+
+                    <input
+                        id="registerEmail"
+                        type="email"
+                        placeholder="Enter email"
+                        autocomplete="email"
+                    >
+
+                </div>
+
+
+                <div class="form-group">
+
+                    <label>Password</label>
+
+                    <input
+                        id="registerPassword"
+                        type="password"
+                        placeholder="Create password"
+                        autocomplete="new-password"
+                    >
+
+                </div>
+
+
+                <button
+                    class="primary-button"
+                    onclick="register()"
+                >
+                    Create Account
+                </button>
+
+            </div>
+
+
+            <div
+                id="authMessage"
+                class="message"
+            ></div>
+
+        </div>
+
+    </div>
+
+
+    <!-- CHAT -->
+
+    <div
+        id="chatSection"
+        class="container hidden"
+    >
+
+        <div class="chat-card">
+
+            <div id="chat">
+
+                <div class="chat-message ai-message">
+                    Hello! I am The Fix.
+                    How can I help you?
+                </div>
+
+            </div>
+
+
+            <div class="input-area">
+
+                <input
+                    id="messageInput"
+                    type="text"
+                    placeholder="Message The Fix..."
+                    onkeydown="handleEnter(event)"
+                    autocomplete="off"
+                >
+
+                <button
+                    class="send-button"
+                    onclick="sendMessage()"
+                >
+                    Send
+                </button>
+
+            </div>
+
+
+            <!-- PDF UPLOAD -->
+
+            <div class="upload-area">
+
+                <strong>📄 Upload PDF</strong>
+
+                <br><br>
+
+                <input
+                    id="pdfFile"
+                    type="file"
+                    accept=".pdf,application/pdf"
+                >
+
+                <button
+                    class="send-button"
+                    onclick="uploadPDF()"
+                >
+                    Upload
+                </button>
+
+                <div id="uploadStatus"></div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <script>
+
+        const API_URL =
+            "http://127.0.0.1:8000";
+
+
+        let currentUser =
+            JSON.parse(
+                localStorage.getItem(
+                    "the_fix_user"
+                )
+            );
+
+
+        function showMessage(
+            message,
+            type
+        ) {
+
+            const element =
+                document.getElementById(
+                    "authMessage"
+                );
+
+            element.textContent =
+                message;
+
+            element.className =
+                "message " + type;
+
+        }
+
+
+        function showLogin() {
+
+            document
+                .getElementById(
+                    "loginForm"
+                )
+                .classList
+                .remove("hidden");
+
+            document
+                .getElementById(
+                    "registerForm"
+                )
+                .classList
+                .add("hidden");
+
+            document
+                .getElementById(
+                    "loginTab"
+                )
+                .classList
+                .add("active");
+
+            document
+                .getElementById(
+                    "registerTab"
+                )
+                .classList
+                .remove("active");
+
+            document
+                .getElementById(
+                    "authMessage"
+                )
+                .className =
+                "message";
+
+        }
+
+
+        function showRegister() {
+
+            document
+                .getElementById(
+                    "loginForm"
+                )
+                .classList
+                .add("hidden");
+
+            document
+                .getElementById(
+                    "registerForm"
+                )
+                .classList
+                .remove("hidden");
+
+            document
+                .getElementById(
+                    "loginTab"
+                )
+                .classList
+                .remove("active");
+
+            document
+                .getElementById(
+                    "registerTab"
+                )
+                .classList
+                .add("active");
+
+            document
+                .getElementById(
+                    "authMessage"
+                )
+                .className =
+                "message";
+
+        }
+
+
+        async function register() {
+
+            const username =
+                document
+                    .getElementById(
+                        "registerUsername"
+                    )
+                    .value
+                    .trim();
+
+            const email =
+                document
+                    .getElementById(
+                        "registerEmail"
+                    )
+                    .value
+                    .trim();
+
+            const password =
+                document
+                    .getElementById(
+                        "registerPassword"
+                    )
+                    .value;
+
+
+            if (
+                !username ||
+                !email ||
+                !password
+            ) {
+
+                showMessage(
+                    "Please complete all fields.",
+                    "error"
+                );
+
+                return;
+
+            }
+
+
+            try {
+
+                const response =
+                    await fetch(
+                        API_URL +
+                        "/register",
+                        {
+                            method: "POST",
+
+                            headers: {
+                                "Content-Type":
+                                    "application/json"
+                            },
+
+                            body:
+                                JSON.stringify({
+                                    username,
+                                    email,
+                                    password
+                                })
+                        }
+                    );
+
+
+                const data =
+                    await response.json();
+
+
+                if (
+                    !response.ok ||
+                    data.status !==
+                    "registered"
+                ) {
+
+                    showMessage(
+                        data.error ||
+                        "Registration failed.",
+                        "error"
+                    );
+
+                    return;
+
+                }
+
+
+                showMessage(
+                    "Account created successfully. You can now log in.",
+                    "success"
+                );
+
+
+                document
+                    .getElementById(
+                        "loginUsername"
+                    )
+                    .value =
+                    username;
+
+
+                document
+                    .getElementById(
+                        "registerPassword"
+                    )
+                    .value = "";
+
+
+                showLogin();
+
+            }
+
+
+            catch (error) {
+
+                console.error(error);
+
+                showMessage(
+                    "Could not connect to The Fix.",
+                    "error"
+                );
+
+            }
+
+        }
+
+
+        async function login() {
+
+            const username =
+                document
+                    .getElementById(
+                        "loginUsername"
+                    )
+                    .value
+                    .trim();
+
+            const password =
+                document
+                    .getElementById(
+                        "loginPassword"
+                    )
+                    .value;
+
+
+            if (
+                !username ||
+                !password
+            ) {
+
+                showMessage(
+                    "Enter your username and password.",
+                    "error"
+                );
+
+                return;
+
+            }
+
+
+            try {
+
+                const response =
+                    await fetch(
+                        API_URL +
+                        "/login",
+                        {
+                            method: "POST",
+
+                            headers: {
+                                "Content-Type":
+                                    "application/json"
+                            },
+
+                            body:
+                                JSON.stringify({
+                                    username,
+                                    password
+                                })
+                        }
+                    );
+
+
+                const data =
+                    await response.json();
+
+
+                if (
+                    !response.ok ||
+                    data.status !==
+                    "logged_in"
+                ) {
+
+                    showMessage(
+                        data.error ||
+                        "Login failed.",
+                        "error"
+                    );
+
+                    return;
+
+                }
+
+
+                currentUser =
+                    data.user;
+
+
+                localStorage.setItem(
+                    "the_fix_user",
+                    JSON.stringify(
+                        currentUser
+                    )
+                );
+
+
+                showChat();
+
+            }
+
+
+            catch (error) {
+
+                console.error(error);
+
+                showMessage(
+                    "Could not connect to The Fix.",
+                    "error"
+                );
+
+            }
+
+        }
+
+
+        function showChat() {
+
+            document
+                .getElementById(
+                    "authSection"
+                )
+                .classList
+                .add("hidden");
+
+            document
+                .getElementById(
+                    "chatSection"
+                )
+                .classList
+                .remove("hidden");
+
+            document
+                .getElementById(
+                    "accountArea"
+                )
+                .classList
+                .remove("hidden");
+
+            document
+                .getElementById(
+                    "usernameDisplay"
+                )
+                .textContent =
+                "Logged in as " +
+                currentUser.username;
+
+            document
+                .getElementById(
+                    "messageInput"
+                )
+                .focus();
+
+        }
+
+
+        function logout() {
+
+            currentUser =
+                null;
+
+            localStorage.removeItem(
+                "the_fix_user"
+            );
+
+            location.reload();
+
+        }
+
+
+        function handleEnter(event) {
+
+            if (
+                event.key ===
+                "Enter"
+            ) {
+
+                event.preventDefault();
+
+                sendMessage();
+
+            }
+
+        }
+
+
+        function addMessage(
+            text,
+            type
+        ) {
+
+            const chat =
+                document.getElementById(
+                    "chat"
+                );
+
+
+            const message =
+                document.createElement(
+                    "div"
+                );
+
+
+            message.className =
+                "chat-message " +
+                type;
+
+
+            message.textContent =
+                text;
+
+
+            chat.appendChild(
+                message
+            );
+
+
+            chat.scrollTop =
+                chat.scrollHeight;
+
+        }
+
+
+        async function sendMessage() {
+
+            if (!currentUser) {
+
+                return;
+
+            }
+
+
+            const input =
+                document.getElementById(
+                    "messageInput"
+                );
+
+
+            const message =
+                input.value.trim();
+
+
+            if (!message) {
+
+                return;
+
+            }
+
+
+            addMessage(
+                message,
+                "user-message"
+            );
+
+
+            input.value = "";
+
+
+            addMessage(
+                "The Fix is thinking...",
+                "ai-message"
+            );
+
+
+            const chat =
+                document.getElementById(
+                    "chat"
+                );
+
+
+            const thinkingMessage =
+                chat.lastElementChild;
+
+
+            try {
+
+                const response =
+                    await fetch(
+                        API_URL +
+                        "/chat",
+                        {
+                            method: "POST",
+
+                            headers: {
+                                "Content-Type":
+                                    "application/json"
+                            },
+
+                            body:
+                                JSON.stringify({
+                                    message,
+                                    user_id:
+                                        currentUser.user_id
+                                })
+                        }
+                    );
+
+
+                const data =
+                    await response.json();
+
+
+                if (
+                    data.answer
+                ) {
+
+                    thinkingMessage.textContent =
+                        data.answer;
+
+                }
+
+                else if (
+                    data.error
+                ) {
+
+                    thinkingMessage.textContent =
+                        "Error: " +
+                        data.error;
+
+                }
+
+                else {
+
+                    thinkingMessage.textContent =
+                        "The Fix could not process that request.";
+
+                }
+
+            }
+
+
+            catch (error) {
+
+                console.error(error);
+
+                thinkingMessage.textContent =
+                    "Could not connect to The Fix.";
+
+            }
+
+        }
+
+
+        async function uploadPDF() {
+
+            if (!currentUser) {
+
+                return;
+
+            }
+
+
+            const fileInput =
+                document.getElementById(
+                    "pdfFile"
+                );
+
+
+            const status =
+                document.getElementById(
+                    "uploadStatus"
+                );
+
+
+            if (
+                !fileInput.files.length
+            ) {
+
+                status.textContent =
+                    "Please select a PDF.";
+
+                return;
+
+            }
+
+
+            const file =
+                fileInput.files[0];
+
+
+            if (
+                file.type !==
+                "application/pdf" &&
+                !file.name
+                    .toLowerCase()
+                    .endsWith(".pdf")
+            ) {
+
+                status.textContent =
+                    "Please select a valid PDF file.";
+
+                return;
+
+            }
+
+
+            const formData =
+                new FormData();
+
+
+            formData.append(
+                "file",
+                file
+            );
+
+
+            status.textContent =
+                "Uploading PDF...";
+
+
+            try {
+
+                /*
+                 * IMPORTANT:
+                 * The backend endpoint is /upload-pdf.
+                 * The old frontend incorrectly used /pdf.
+                 */
+
+                const response =
+                    await fetch(
+                        API_URL +
+                        "/upload-pdf",
+                        {
+                            method: "POST",
+                            body: formData
+                        }
+                    );
+
+
+                let data;
+
+                try {
+
+                    data =
+                        await response.json();
+
+                }
+
+                catch (jsonError) {
+
+                    data = {};
+
+                }
+
+
+                if (
+                    response.ok
+                ) {
+
+                    if (
+                        data.status ===
+                        "PDF uploaded successfully"
+                    ) {
+
+                        status.textContent =
+                            "PDF uploaded successfully. " +
+                            (
+                                data.characters_extracted ||
+                                0
+                            ) +
+                            " characters extracted.";
+
+                    }
+
+                    else {
+
+                        status.textContent =
+                            data.message ||
+                            data.status ||
+                            "PDF uploaded successfully.";
+
+                    }
+
+                    fileInput.value = "";
+
+                }
+
+                else {
+
+                    status.textContent =
+                        data.error ||
+                        data.detail ||
+                        "PDF upload failed.";
+
+                }
+
+            }
+
+
+            catch (error) {
+
+                console.error(error);
+
+                status.textContent =
+                    "Could not connect to The Fix.";
+
+            }
+
+        }
+
+
+        window.onload =
+            function () {
+
+                if (currentUser) {
+
+                    showChat();
+
+                }
+
+            };
+
+    </script>
+
+</body>
+
+</html>

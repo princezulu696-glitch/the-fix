@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Fix AI</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+            background: #f1f3f6;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .app {
+            width: 96%;
+            max-width: 1000px;
+            height: 94vh;
+            background: white;
+            border-radius: 18px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.12);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .header {
+            background: #111827;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 30px;
+            letter-spacing: 2px;
+        }
+
+        .header p {
+            margin-top: 6px;
+            color: #cbd5e1;
+        }
+
+        .chat {
+            flex: 1;
+            padding: 25px;
+            overflow-y: auto;
+        }
+
+        .message {
+            margin-bottom: 18px;
+            padding: 14px 18px;
+            border-radius: 14px;
+            max-width: 80%;
+            line-height: 1.5;
+            white-space: pre-wrap;
+        }
+
+        .fix {
+            background: #eef2ff;
+            margin-right: auto;
+        }
+
+        .user {
+            background: #111827;
+            color: white;
+            margin-left: auto;
+        }
+
+        .file-info {
+            padding: 8px 20px;
+            color: #64748b;
+            font-size: 13px;
+            text-align: center;
+        }
+
+        .input-area {
+            padding: 15px;
+            border-top: 1px solid #ddd;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .upload-button {
+            background: #e5e7eb;
+            color: #111827;
+            padding: 10px 15px;
+            border-radius: 9px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .upload-button:hover {
+            background: #d1d5db;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .message-row {
+            display: flex;
+            gap: 10px;
+        }
+
+        #message {
+            flex: 1;
+            padding: 14px;
+            border: 1px solid #ccc;
+            border-radius: 10px;
+            font-size: 16px;
+            outline: none;
+        }
+
+        button {
+            border: none;
+            border-radius: 10px;
+            padding: 14px 22px;
+            background: #111827;
+            color: white;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        button:hover {
+            opacity: 0.85;
+        }
+
+        .status {
+            text-align: center;
+            padding: 8px;
+            font-size: 13px;
+            color: #64748b;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="app">
+
+    <div class="header">
+        <h1>THE FIX</h1>
+        <p>Your AI Assistant</p>
+    </div>
+
+    <div class="chat" id="chat">
+
+        <div class="message fix">
+            Hello! I am The Fix.<br><br>
+            I can help you with questions, calculations and PDF documents.
+        </div>
+
+    </div>
+
+    <div class="file-info" id="fileInfo">
+        No file selected
+    </div>
+
+    <div class="status" id="status">
+        Connected to The Fix
+    </div>
+
+    <div class="input-area">
+
+        <div class="controls">
+
+            <label class="upload-button" for="fileInput">
+                📎 Upload PDF
+            </label>
+
+            <input
+                type="file"
+                id="fileInput"
+                accept=".pdf,application/pdf"
+                onchange="fileSelected()"
+            >
+
+        </div>
+
+        <div class="message-row">
+
+            <input
+                type="text"
+                id="message"
+                placeholder="Ask The Fix anything..."
+                onkeydown="handleEnter(event)"
+            >
+
+            <button onclick="sendMessage()">Send</button>
+
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+
+const API_URL = "http://127.0.0.1:8000";
+
+
+/*
+ * CREATE A UNIQUE ID FOR THIS USER
+ *
+ * The ID is saved in the browser.
+ * The same browser will keep the same ID.
+ */
+
+function getUserID() {
+
+    let userID = localStorage.getItem("the_fix_user_id");
+
+    if (!userID) {
+
+        userID =
+            "user_" +
+            crypto.randomUUID();
+
+        localStorage.setItem(
+            "the_fix_user_id",
+            userID
+        );
+    }
+
+    return userID;
+}
+
+
+const USER_ID = getUserID();
+
+
+let selectedFile = null;
+let pdfUploaded = false;
+
+
+function addMessage(text, type) {
+
+    const chat =
+        document.getElementById("chat");
+
+    const message =
+        document.createElement("div");
+
+    message.className =
+        "message " + type;
+
+    message.textContent =
+        text;
+
+    chat.appendChild(message);
+
+    chat.scrollTop =
+        chat.scrollHeight;
+}
+
+
+function handleEnter(event) {
+
+    if (event.key === "Enter") {
+
+        sendMessage();
+
+    }
+
+}
+
+
+function fileSelected() {
+
+    const input =
+        document.getElementById("fileInput");
+
+    selectedFile =
+        input.files[0];
+
+    pdfUploaded = false;
+
+    if (selectedFile) {
+
+        document.getElementById(
+            "fileInfo"
+        ).textContent =
+            "Selected: " +
+            selectedFile.name;
+
+    }
+
+}
+
+
+async function uploadPDF() {
+
+    if (!selectedFile) {
+
+        return false;
+
+    }
+
+    if (
+        selectedFile.type !== "application/pdf" &&
+        !selectedFile.name
+            .toLowerCase()
+            .endsWith(".pdf")
+    ) {
+
+        addMessage(
+            "Please select a PDF file.",
+            "fix"
+        );
+
+        return false;
+    }
+
+    document.getElementById(
+        "status"
+    ).textContent =
+        "Reading PDF locally...";
+
+    const formData =
+        new FormData();
+
+    formData.append(
+        "file",
+        selectedFile
+    );
+
+    const response =
+        await fetch(
+            API_URL + "/pdf",
+            {
+                method: "POST",
+                body: formData
+            }
+        );
+
+    const data =
+        await response.json();
+
+    if (
+        data.status ===
+        "PDF uploaded successfully"
+    ) {
+
+        pdfUploaded = true;
+
+        addMessage(
+            "PDF uploaded successfully.\n\n" +
+            "File: " +
+            data.file +
+            "\n" +
+            "Characters extracted: " +
+            data.characters_extracted +
+            "\n\n" +
+            "The Fix has read the PDF locally.\n" +
+            "You can now ask questions about it.",
+            "fix"
+        );
+
+        document.getElementById(
+            "status"
+        ).textContent =
+            "PDF ready for questions";
+
+        return true;
+    }
+
+    if (data.error) {
+
+        addMessage(
+            "PDF Error: " +
+            data.error,
+            "fix"
+        );
+
+        return false;
+    }
+
+    addMessage(
+        "The PDF could not be processed.",
+        "fix"
+    );
+
+    return false;
+}
+
+
+async function searchPDF(question) {
+
+    document.getElementById(
+        "status"
+    ).textContent =
+        "Searching the PDF locally...";
+
+    const response =
+        await fetch(
+            API_URL + "/pdf-search",
+            {
+                method: "POST",
+
+                headers: {
+                    "Content-Type":
+                        "application/json"
+                },
+
+                body: JSON.stringify({
+                    question: question
+                })
+            }
+        );
+
+    const data =
+        await response.json();
+
+    if (
+        data.results &&
+        data.results.length > 0
+    ) {
+
+        let answer =
+            "Information found in " +
+            data.file +
+            ":\n\n";
+
+        data.results.forEach(
+            function(result, index) {
+
+                answer +=
+                    "Section " +
+                    (index + 1) +
+                    ":\n" +
+                    result.text +
+                    "\n\n";
+
+            }
+        );
+
+        addMessage(
+            answer,
+            "fix"
+        );
+
+    }
+
+    else if (data.answer) {
+
+        addMessage(
+            data.answer,
+            "fix"
+        );
+
+    }
+
+    else if (data.error) {
+
+        addMessage(
+            "PDF Search Error: " +
+            data.error,
+            "fix"
+        );
+
+    }
+
+    else {
+
+        addMessage(
+            "No relevant information was found in the PDF.",
+            "fix"
+        );
+
+    }
+
+}
+
+
+async function sendMessage() {
+
+    const input =
+        document.getElementById("message");
+
+    const message =
+        input.value.trim();
+
+    if (
+        !message &&
+        !selectedFile
+    ) {
+
+        return;
+
+    }
+
+    if (message) {
+
+        addMessage(
+            message,
+            "user"
+        );
+
+    }
+
+    input.value = "";
+
+    document.getElementById(
+        "status"
+    ).textContent =
+        "The Fix is working...";
+
+    try {
+
+        /*
+         * PDF SELECTED
+         */
+
+        if (selectedFile) {
+
+            const uploaded =
+                await uploadPDF();
+
+            if (!uploaded) {
+
+                return;
+
+            }
+
+            if (message) {
+
+                await searchPDF(
+                    message
+                );
+
+            }
+
+            selectedFile = null;
+
+            document.getElementById(
+                "fileInput"
+            ).value = "";
+
+            document.getElementById(
+                "fileInfo"
+            ).textContent =
+                "No file selected";
+
+            document.getElementById(
+                "status"
+            ).textContent =
+                "Connected to The Fix";
+
+            return;
+        }
+
+
+        /*
+         * LOCAL PDF QUESTION
+         */
+
+        if (pdfUploaded) {
+
+            await searchPDF(
+                message
+            );
+
+            document.getElementById(
+                "status"
+            ).textContent =
+                "PDF search complete";
+
+            return;
+        }
+
+
+        /*
+         * NORMAL CHAT
+         */
+
+        const response =
+            await fetch(
+                API_URL + "/chat",
+                {
+                    method: "POST",
+
+                    headers: {
+                        "Content-Type":
+                            "application/json"
+                    },
+
+                    body: JSON.stringify({
+
+                        message: message,
+
+                        user_id: USER_ID
+
+                    })
+                }
+            );
+
+
+        const data =
+            await response.json();
+
+
+        if (data.answer) {
+
+            addMessage(
+                data.answer,
+                "fix"
+            );
+
+        }
+
+        else if (data.error) {
+
+            addMessage(
+                "Error: " +
+                data.error,
+                "fix"
+            );
+
+        }
+
+        else {
+
+            addMessage(
+                "The Fix returned an unexpected response.",
+                "fix"
+            );
+
+        }
+
+
+        document.getElementById(
+            "status"
+        ).textContent =
+            "Connected to The Fix";
+
+    }
+
+    catch (error) {
+
+        console.error(error);
+
+        addMessage(
+            "I could not connect to The Fix backend.",
+            "fix"
+        );
+
+        document.getElementById(
+            "status"
+        ).textContent =
+            "Backend connection error";
+
+    }
+
+}
+
+</script>
+
+</body>
+</html>

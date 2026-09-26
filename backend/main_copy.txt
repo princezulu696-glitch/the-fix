@@ -1,0 +1,757 @@
+import os
+import shutil
+import base64
+from datetime import datetime
+
+from dotenv import load_dotenv
+from fastapi import FastAPI, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from openai import OpenAI
+
+from memory import remember, get_memories, forget
+from tools import use_calculator
+from web_search import web_search
+from document_reader import read_pdf
+
+
+# ---------------------------------------------------------
+# CONFIGURATION
+# ---------------------------------------------------------
+
+load_dotenv()
+
+client = OpenAI(
+    api_key=os.getenv("OPENAI_API_KEY")
+)
+
+
+# ---------------------------------------------------------
+# FASTAPI APPLICATION
+# ---------------------------------------------------------
+
+app = FastAPI(
+    title="The Fix API",
+    description="AI backend for The Fix",
+    version="1.0.0"
+)
+
+
+# ---------------------------------------------------------
+# CORS
+# Allows the website to communicate with the backend
+# ---------------------------------------------------------
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://127.0.0.1:5500",
+        "http://localhost:5500"
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# ---------------------------------------------------------
+# DATA MODELS
+# ---------------------------------------------------------
+
+class ChatRequest(BaseModel):
+    message: str
+    user_id: str = "default_user"
+
+
+class PDFQuestionRequest(BaseModel):
+    question: str
+
+
+# ---------------------------------------------------------
+# THE FIX AI INSTRUCTIONS
+# ---------------------------------------------------------
+
+THE_FIX_INSTRUCTIONS = """
+You are The Fix, an advanced AI assistant.
+
+Your name is The Fix.
+
+You are helpful, intelligent, respectful and natural.
+
+You are not human and must not claim to have real human feelings
+or consciousness.
+
+Pay attention to the user's emotional tone and respond with
+appropriate empathy.
+
+Understand and respond in the language used by the user whenever
+possible.
+
+Give simple explanations when the user asks for simple explanations.
+
+Give detailed technical explanations when the user needs them.
+
+Help users with learning, mathematics, programming, electronics,
+engineering, writing, problem solving and general questions.
+
+Use relevant user memories when they are provided.
+
+Never invent memories.
+
+Never reveal another user's memories.
+
+Never reveal API keys, passwords or confidential credentials.
+
+When answering questions about a PDF, use the PDF text provided to
+you as the main source.
+
+When answering questions about an image, carefully inspect the image
+and answer using what is actually visible.
+
+Do not invent details that cannot be seen.
+
+If you are uncertain about something in an image, clearly say so.
+
+If you are uncertain about something generally, say so.
+
+Your goal is to provide useful, accurate and understandable answers.
+"""
+
+
+# ---------------------------------------------------------
+# HOME
+# ---------------------------------------------------------
+
+@app.get("/")
+def root():
+
+    return {
+        "name": "The Fix",
+        "status": "online",
+        "message": "The Fix API is running."
+    }
+
+
+# ---------------------------------------------------------
+# HEALTH CHECK
+# ---------------------------------------------------------
+
+@app.get("/health")
+def health():
+
+    return {
+        "status": "healthy",
+        "service": "the-fix",
+        "time": datetime.now().isoformat()
+    }
+
+
+# ---------------------------------------------------------
+# MEMORY
+# ---------------------------------------------------------
+
+@app.post("/memory")
+def save_user_memory(
+    user_id: str,
+    key: str,
+    value: str
+):
+
+    remember(
+        user_id,
+        key,
+        value
+    )
+
+    return {
+        "status": "saved",
+        "user_id": user_id,
+        "key": key
+    }
+
+
+@app.get("/memory/{user_id}")
+def read_user_memory(user_id: str):
+
+    return {
+        "user_id": user_id,
+        "memories": get_memories(user_id)
+    }
+
+
+@app.delete("/memory/{user_id}/{key}")
+def delete_user_memory(
+    user_id: str,
+    key: str
+):
+
+    deleted = forget(
+        user_id,
+        key
+    )
+
+    return {
+        "user_id": user_id,
+        "key": key,
+        "deleted": deleted
+    }
+
+
+# ---------------------------------------------------------
+# PDF UPLOAD
+# ---------------------------------------------------------
+
+@app.post("/pdf")
+async def upload_pdf(
+    file: UploadFile = File(...)
+):
+
+    if not file.filename.lower().endswith(".pdf"):
+
+        return {
+            "error": "Only PDF files are supported."
+        }
+
+
+    os.makedirs(
+        "uploads",
+        exist_ok=True
+    )
+
+
+    file_path = os.path.join(
+        "uploads",
+        file.filename
+    )
+
+
+    try:
+
+        with open(
+            file_path,
+            "wb"
+        ) as buffer:
+
+            shutil.copyfileobj(
+                file.file,
+                buffer
+            )
+
+
+        text = read_pdf(
+            file_path
+        )
+
+
+        if not text.strip():
+
+            return {
+                "name": "The Fix",
+                "file": file.filename,
+                "error": "No readable text was found in this PDF."
+            }
+
+
+        text_file = os.path.join(
+            "uploads",
+            file.filename + ".txt"
+        )
+
+
+        with open(
+            text_file,
+            "w",
+            encoding="utf-8"
+        ) as f:
+
+            f.write(text)
+
+
+        return {
+            "name": "The Fix",
+            "file": file.filename,
+            "status": "PDF uploaded successfully",
+            "message": "The PDF has been read. You can now ask questions using /pdf-question.",
+            "characters_extracted": len(text)
+        }
+
+
+    except Exception as e:
+
+        return {
+            "name": "The Fix",
+            "error": "The PDF could not be processed.",
+            "details": str(e)
+        }
+
+
+# ---------------------------------------------------------
+# ASK QUESTIONS ABOUT PDF
+# ---------------------------------------------------------
+
+@app.post("/pdf-question")
+def ask_pdf_question(
+    request: PDFQuestionRequest
+):
+
+    question = request.question.strip()
+
+
+    if not question:
+
+        return {
+            "error": "Question cannot be empty."
+        }
+
+
+    uploads_folder = "uploads"
+
+
+    if not os.path.exists(
+        uploads_folder
+    ):
+
+        return {
+            "error": "No PDF has been uploaded yet."
+        }
+
+
+    pdf_text_files = [
+
+        file
+
+        for file in os.listdir(
+            uploads_folder
+        )
+
+        if file.endswith(".pdf.txt")
+    ]
+
+
+    if not pdf_text_files:
+
+        return {
+            "error": "No processed PDF was found. Upload a PDF first."
+        }
+
+
+    pdf_text_files.sort(
+        key=lambda x: os.path.getmtime(
+            os.path.join(
+                uploads_folder,
+                x
+            )
+        ),
+        reverse=True
+    )
+
+
+    latest_file = pdf_text_files[0]
+
+
+    text_file_path = os.path.join(
+        uploads_folder,
+        latest_file
+    )
+
+
+    try:
+
+        with open(
+            text_file_path,
+            "r",
+            encoding="utf-8"
+        ) as f:
+
+            pdf_text = f.read()
+
+
+        pdf_text = pdf_text[:50000]
+
+
+        prompt = f"""
+PDF CONTENT:
+
+{pdf_text}
+
+END OF PDF CONTENT.
+
+USER QUESTION:
+
+{question}
+
+Answer the user's question using the PDF content above.
+
+If the answer is not contained in the PDF, say:
+
+"The answer was not found in the uploaded PDF."
+
+Give a clear and simple answer.
+"""
+
+
+        response = client.responses.create(
+
+            model="gpt-5.6-luna",
+
+            instructions=THE_FIX_INSTRUCTIONS,
+
+            input=prompt
+        )
+
+
+        return {
+
+            "name": "The Fix",
+
+            "tool": "pdf_reader",
+
+            "file": latest_file.replace(
+                ".pdf.txt",
+                ".pdf"
+            ),
+
+            "question": question,
+
+            "answer": response.output_text
+        }
+
+
+    except Exception as e:
+
+        return {
+
+            "name": "The Fix",
+
+            "error": "The PDF question could not be processed.",
+
+            "details": str(e)
+        }
+
+
+# ---------------------------------------------------------
+# IMAGE UNDERSTANDING
+# ---------------------------------------------------------
+
+@app.post("/image-question")
+async def ask_image_question(
+    file: UploadFile = File(...),
+
+    question: str = "Describe this image and explain the important information in it."
+):
+
+    allowed_types = [
+
+        "image/jpeg",
+
+        "image/png",
+
+        "image/webp"
+    ]
+
+
+    if file.content_type not in allowed_types:
+
+        return {
+
+            "error": "Supported image types are JPG, PNG and WEBP."
+        }
+
+
+    try:
+
+        image_bytes = await file.read()
+
+
+        if not image_bytes:
+
+            return {
+
+                "error": "The image file is empty."
+            }
+
+
+        encoded_image = base64.b64encode(
+            image_bytes
+        ).decode(
+            "utf-8"
+        )
+
+
+        image_url = (
+
+            f"data:{file.content_type};base64,{encoded_image}"
+
+        )
+
+
+        response = client.responses.create(
+
+            model="gpt-5.6-luna",
+
+            instructions=THE_FIX_INSTRUCTIONS,
+
+            input=[
+
+                {
+
+                    "role": "user",
+
+                    "content": [
+
+                        {
+
+                            "type": "input_text",
+
+                            "text": question
+
+                        },
+
+                        {
+
+                            "type": "input_image",
+
+                            "image_url": image_url
+
+                        }
+
+                    ]
+
+                }
+
+            ]
+
+        )
+
+
+        return {
+
+            "name": "The Fix",
+
+            "tool": "vision",
+
+            "file": file.filename,
+
+            "question": question,
+
+            "answer": response.output_text
+        }
+
+
+    except Exception as e:
+
+        return {
+
+            "name": "The Fix",
+
+            "error": "The image could not be analyzed.",
+
+            "details": str(e)
+        }
+
+
+# ---------------------------------------------------------
+# CHAT
+# ---------------------------------------------------------
+
+@app.post("/chat")
+def chat(
+    request: ChatRequest
+):
+
+    message = request.message.strip()
+
+
+    if not message:
+
+        return {
+
+            "error": "Message cannot be empty."
+        }
+
+
+    # -----------------------------------------------------
+    # CALCULATOR
+    # -----------------------------------------------------
+
+    tool_result = use_calculator(
+        message
+    )
+
+
+    if tool_result is not None:
+
+        return {
+
+            "name": "The Fix",
+
+            "user_id": request.user_id,
+
+            "message": message,
+
+            "tool": tool_result["tool"],
+
+            "expression": tool_result["expression"],
+
+            "answer": (
+                f"The answer is "
+                f"{tool_result['result']}."
+            )
+        }
+
+
+    # -----------------------------------------------------
+    # WEB SEARCH
+    # -----------------------------------------------------
+
+    web_keywords = [
+
+        "latest",
+
+        "current",
+
+        "today",
+
+        "news",
+
+        "recent",
+
+        "this week",
+
+        "this month",
+
+        "who is",
+
+        "what happened",
+
+        "what is happening",
+
+        "price",
+
+        "weather",
+
+        "2026"
+    ]
+
+
+    message_lower = message.lower()
+
+
+    needs_web_search = any(
+
+        keyword in message_lower
+
+        for keyword in web_keywords
+    )
+
+
+    if needs_web_search:
+
+        try:
+
+            result = web_search(
+                message
+            )
+
+
+            return {
+
+                "name": "The Fix",
+
+                "user_id": request.user_id,
+
+                "message": message,
+
+                "tool": "web_search",
+
+                "answer": result["answer"]
+            }
+
+
+        except Exception as e:
+
+            return {
+
+                "name": "The Fix",
+
+                "user_id": request.user_id,
+
+                "error": "Web search could not be completed.",
+
+                "details": str(e)
+            }
+
+
+    # -----------------------------------------------------
+    # NORMAL AI CHAT
+    # -----------------------------------------------------
+
+    try:
+
+        memories = get_memories(
+            request.user_id
+        )
+
+
+        if memories:
+
+            memory_text = "\n".join(
+
+                f"- {key}: {value}"
+
+                for key, value in memories.items()
+            )
+
+        else:
+
+            memory_text = "No saved memories yet."
+
+
+        full_input = f"""
+
+USER MEMORY:
+
+{memory_text}
+
+
+CURRENT USER MESSAGE:
+
+{message}
+
+"""
+
+
+        response = client.responses.create(
+
+            model="gpt-5.6-luna",
+
+            instructions=THE_FIX_INSTRUCTIONS,
+
+            input=full_input
+        )
+
+
+        return {
+
+            "name": "The Fix",
+
+            "user_id": request.user_id,
+
+            "message": message,
+
+            "answer": response.output_text
+        }
+
+
+    except Exception as e:
+
+        return {
+
+            "name": "The Fix",
+
+            "user_id": request.user_id,
+
+            "error": "The AI service could not process the request.",
+
+            "details": str(e)
+        }
