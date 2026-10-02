@@ -2,12 +2,11 @@ fastapi
 uvicorn[standard]
 pydantic
 python-dotenv
-openai
 requests
+python-multipart
 pypdf
 python-docx
 python-pptx
 openpyxl
 pillow
-pytesseract
-pdf2image
+sympy
