@@ -1,1630 +1,5138 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
 
-    <meta charset="UTF-8">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
+<title>The Fix</title>
 
-    <title>The Fix</title>
+<style>
 
-    <style>
+/* ============================================================
+   THE FIX — MODERN AI INTERFACE
+   ============================================================ */
 
-        * {
-            box-sizing: border-box;
-        }
+* {
+    box-sizing: border-box;
+}
 
-        body {
-            margin: 0;
-            font-family: Arial, sans-serif;
-            background: #f4f6f8;
-            color: #222;
-        }
+:root {
+    --bg: #0b0d11;
+    --sidebar: #101319;
+    --panel: #151922;
+    --panel-hover: #1b202b;
+    --border: #272d38;
+    --text: #f5f7fa;
+    --muted: #9299a8;
+    --accent: #10a37f;
+    --accent-hover: #0d8f70;
+    --user: #2b2f38;
+    --danger: #ef4444;
+    --input: #171b23;
+}
 
-        .header {
-            background: #111827;
-            color: white;
-            padding: 18px 25px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
+html,
+body {
+    width: 100%;
+    height: 100%;
+}
 
-        .header h1 {
-            margin: 0;
-            font-size: 24px;
-        }
+body {
+    margin: 0;
+    font-family:
+        Inter,
+        ui-sans-serif,
+        system-ui,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        Arial,
+        sans-serif;
 
-        .header-right {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
+    background: var(--bg);
+    color: var(--text);
+}
 
-        .username-display {
-            font-size: 14px;
-            color: #d1d5db;
-        }
+button,
+input,
+textarea,
+select {
+    font: inherit;
+}
 
-        .logout-button {
-            border: none;
-            background: #dc2626;
-            color: white;
-            padding: 8px 14px;
-            border-radius: 7px;
-            cursor: pointer;
-        }
+button {
+    cursor: pointer;
+}
 
-        .container {
-            max-width: 1000px;
-            margin: 30px auto;
-            padding: 0 20px;
-        }
+.hidden {
+    display: none !important;
+}
 
-        .auth-card,
-        .chat-card {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
-        }
 
-        .auth-card {
-            max-width: 450px;
-            margin: 60px auto;
-            padding: 30px;
-        }
+/* ============================================================
+   AUTH
+   ============================================================ */
 
-        .auth-card h2 {
-            margin-top: 0;
-            text-align: center;
-        }
+#authPage {
+    min-height: 100vh;
 
-        .auth-card p {
-            text-align: center;
-            color: #666;
-        }
+    display: flex;
+    justify-content: center;
+    align-items: center;
 
-        .tabs {
-            display: flex;
-            margin-bottom: 20px;
-        }
+    padding: 24px;
 
-        .tab {
-            flex: 1;
-            padding: 12px;
-            border: none;
-            cursor: pointer;
-            background: #e5e7eb;
-        }
+    background:
+        radial-gradient(
+            circle at 50% 0%,
+            rgba(16,163,127,0.16),
+            transparent 35%
+        ),
+        #0b0d11;
+}
 
-        .tab.active {
-            background: #111827;
-            color: white;
-        }
+.auth-box {
+    width: 100%;
+    max-width: 420px;
 
-        .form-group {
-            margin-bottom: 15px;
-        }
+    padding: 38px;
 
-        .form-group label {
-            display: block;
-            margin-bottom: 6px;
-            font-weight: bold;
-        }
+    background: rgba(21,25,34,0.94);
 
-        .form-group input {
-            width: 100%;
-            padding: 11px;
-            border: 1px solid #ccc;
-            border-radius: 7px;
-            font-size: 15px;
-        }
+    border: 1px solid var(--border);
 
-        .primary-button {
-            width: 100%;
-            padding: 12px;
-            border: none;
-            background: #2563eb;
-            color: white;
-            border-radius: 7px;
-            cursor: pointer;
-            font-size: 15px;
-        }
+    border-radius: 22px;
 
-        .primary-button:hover {
-            background: #1d4ed8;
-        }
+    box-shadow:
+        0 25px 80px rgba(0,0,0,0.45);
 
-        .message {
-            margin-top: 15px;
-            padding: 10px;
-            border-radius: 7px;
-            display: none;
-        }
+    backdrop-filter: blur(18px);
+}
 
-        .message.error {
-            display: block;
-            background: #fee2e2;
-            color: #991b1b;
-        }
+.auth-logo {
+    width: 58px;
+    height: 58px;
 
-        .message.success {
-            display: block;
-            background: #dcfce7;
-            color: #166534;
-        }
+    margin: 0 auto 18px;
 
-        .chat-card {
-            padding: 20px;
-        }
+    display: flex;
+    align-items: center;
+    justify-content: center;
 
-        #chat {
-            height: 500px;
-            overflow-y: auto;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            padding: 15px;
-            background: #fafafa;
-            margin-bottom: 15px;
-        }
+    border-radius: 18px;
 
-        .chat-message {
-            margin-bottom: 15px;
-            padding: 12px;
-            border-radius: 8px;
-            line-height: 1.5;
-            white-space: pre-wrap;
-        }
+    background: linear-gradient(
+        135deg,
+        #10a37f,
+        #087f63
+    );
 
-        .user-message {
-            background: #dbeafe;
-            margin-left: 15%;
-        }
+    font-size: 27px;
 
-        .ai-message {
-            background: #e5e7eb;
-            margin-right: 15%;
-        }
+    box-shadow:
+        0 12px 30px rgba(16,163,127,0.25);
+}
 
-        .input-area {
-            display: flex;
-            gap: 10px;
-        }
+.auth-box h1 {
+    margin: 0;
 
-        #messageInput {
-            flex: 1;
-            padding: 12px;
-            border: 1px solid #ccc;
-            border-radius: 7px;
-            font-size: 15px;
-        }
+    text-align: center;
 
-        .send-button {
-            padding: 12px 20px;
-            border: none;
-            background: #2563eb;
-            color: white;
-            border-radius: 7px;
-            cursor: pointer;
-        }
+    font-size: 28px;
+    letter-spacing: -0.5px;
+}
 
-        .send-button:hover {
-            background: #1d4ed8;
-        }
+.auth-box p {
+    margin: 8px 0 28px;
 
-        .upload-area {
-            margin-top: 15px;
-            padding: 15px;
-            border: 1px dashed #aaa;
-            border-radius: 8px;
-        }
+    text-align: center;
 
-        .upload-area input {
-            margin-right: 10px;
-        }
+    color: var(--muted);
 
-        #uploadStatus {
-            margin-top: 10px;
-            font-size: 14px;
-        }
+    font-size: 14px;
+}
 
-        #documentList {
-            margin-top: 15px;
-        }
+.auth-box input {
+    width: 100%;
 
-        .document-item {
-            padding: 10px;
-            margin-top: 8px;
-            background: #f3f4f6;
-            border: 1px solid #d1d5db;
-            border-radius: 7px;
-            cursor: pointer;
-            word-break: break-word;
-        }
+    padding: 14px 15px;
 
-        .document-item:hover {
-            background: #e5e7eb;
-        }
+    margin-bottom: 12px;
 
-        .document-item.selected {
-            background: #dbeafe;
-            border: 2px solid #2563eb;
-        }
+    background: #0e1117;
 
-        .document-title {
-            font-weight: bold;
-            margin-bottom: 8px;
-        }
+    color: white;
 
-        .selected-document {
-            margin-top: 12px;
-            padding: 10px;
-            background: #ecfdf5;
-            border: 1px solid #10b981;
-            border-radius: 7px;
-            color: #065f46;
-            font-size: 14px;
-        }
+    border: 1px solid var(--border);
 
-        .hidden {
-            display: none !important;
-        }
+    border-radius: 11px;
 
-    </style>
+    outline: none;
+
+    transition: 0.2s;
+}
+
+.auth-box input:focus {
+    border-color: var(--accent);
+
+    box-shadow:
+        0 0 0 3px rgba(16,163,127,0.12);
+}
+
+.auth-box button.main-auth {
+    width: 100%;
+
+    padding: 14px;
+
+    margin-top: 5px;
+
+    border: none;
+
+    border-radius: 11px;
+
+    background: var(--accent);
+
+    color: white;
+
+    font-weight: 700;
+
+    transition: 0.2s;
+}
+
+.auth-box button.main-auth:hover {
+    background: var(--accent-hover);
+    transform: translateY(-1px);
+}
+
+.auth-switch {
+    margin-top: 20px;
+
+    text-align: center;
+
+    color: var(--muted);
+
+    font-size: 14px;
+}
+
+.auth-switch button {
+    border: none;
+
+    background: none;
+
+    color: #4fd1ad;
+
+    font-weight: 600;
+}
+
+.message {
+    margin-top: 12px;
+
+    padding: 11px;
+
+    border-radius: 9px;
+
+    display: none;
+
+    font-size: 13px;
+}
+
+
+/* ============================================================
+   MAIN APPLICATION
+   ============================================================ */
+
+#chatPage {
+    width: 100%;
+    height: 100vh;
+
+    overflow: hidden;
+
+    display: flex;
+
+    background: var(--bg);
+}
+
+
+/* ============================================================
+   SIDEBAR
+   ============================================================ */
+
+.sidebar {
+    width: 270px;
+    height: 100vh;
+
+    flex-shrink: 0;
+
+    display: flex;
+    flex-direction: column;
+
+    background: var(--sidebar);
+
+    border-right: 1px solid var(--border);
+
+    transition:
+        width 0.25s ease,
+        transform 0.25s ease;
+}
+
+.sidebar.collapsed {
+    width: 0;
+
+    overflow: hidden;
+
+    border-right: none;
+}
+
+.sidebar-top {
+    padding: 18px;
+}
+
+.brand {
+    display: flex;
+
+    align-items: center;
+
+    gap: 11px;
+
+    margin-bottom: 18px;
+}
+
+.brand-icon {
+    width: 36px;
+    height: 36px;
+
+    display: flex;
+
+    justify-content: center;
+    align-items: center;
+
+    border-radius: 11px;
+
+    background:
+        linear-gradient(
+            135deg,
+            #10a37f,
+            #087f63
+        );
+
+    font-size: 17px;
+}
+
+.brand-name {
+    font-size: 17px;
+    font-weight: 700;
+}
+
+.new-chat {
+    width: 100%;
+
+    padding: 11px 13px;
+
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    border: 1px solid var(--border);
+
+    border-radius: 10px;
+
+    background: transparent;
+
+    color: var(--text);
+
+    transition: 0.2s;
+}
+
+.new-chat:hover {
+    background: var(--panel-hover);
+}
+
+.sidebar-section {
+    padding: 8px 12px;
+}
+
+.sidebar-label {
+    padding: 8px;
+
+    color: #737b8b;
+
+    font-size: 11px;
+
+    font-weight: 700;
+
+    text-transform: uppercase;
+
+    letter-spacing: 0.08em;
+}
+
+.sidebar-item {
+    width: 100%;
+
+    padding: 10px;
+
+    display: flex;
+    align-items: center;
+
+    gap: 11px;
+
+    border: none;
+
+    border-radius: 9px;
+
+    background: transparent;
+
+    color: #cbd0d9;
+
+    text-align: left;
+
+    transition: 0.2s;
+}
+
+.sidebar-item:hover {
+    background: var(--panel-hover);
+    color: white;
+}
+
+.sidebar-item.active {
+    background: #1b222c;
+    color: white;
+}
+
+.sidebar-icon {
+    width: 22px;
+
+    text-align: center;
+
+    opacity: 0.9;
+}
+
+.sidebar-bottom {
+    margin-top: auto;
+
+    padding: 12px;
+
+    border-top: 1px solid var(--border);
+}
+
+.account {
+    display: flex;
+
+    align-items: center;
+
+    gap: 10px;
+
+    padding: 9px;
+}
+
+.avatar {
+    width: 34px;
+    height: 34px;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    flex-shrink: 0;
+
+    border-radius: 50%;
+
+    background: #303642;
+
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.account-info {
+    min-width: 0;
+    flex: 1;
+}
+
+.account-name {
+    overflow: hidden;
+
+    white-space: nowrap;
+
+    text-overflow: ellipsis;
+
+    font-size: 13px;
+
+    font-weight: 600;
+}
+
+.account-label {
+    color: var(--muted);
+
+    font-size: 11px;
+}
+
+.logout-small {
+    border: none;
+
+    background: transparent;
+
+    color: #9299a8;
+
+    padding: 7px;
+
+    border-radius: 7px;
+}
+
+.logout-small:hover {
+    background: #262b35;
+    color: white;
+}
+
+
+/* ============================================================
+   MAIN AREA
+   ============================================================ */
+
+.main-area {
+    min-width: 0;
+
+    flex: 1;
+
+    height: 100vh;
+
+    display: flex;
+    flex-direction: column;
+
+    position: relative;
+}
+
+
+/* ============================================================
+   TOP BAR
+   ============================================================ */
+
+.app-topbar {
+    height: 60px;
+
+    flex-shrink: 0;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    padding: 0 18px;
+
+    border-bottom: 1px solid var(--border);
+
+    background: rgba(11,13,17,0.88);
+
+    backdrop-filter: blur(14px);
+
+    z-index: 10;
+}
+
+.topbar-left {
+    display: flex;
+
+    align-items: center;
+
+    gap: 10px;
+}
+
+.menu-button {
+    width: 38px;
+    height: 38px;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    border: none;
+
+    border-radius: 9px;
+
+    background: transparent;
+
+    color: #cbd0d9;
+
+    font-size: 20px;
+}
+
+.menu-button:hover {
+    background: var(--panel-hover);
+}
+
+.mobile-title {
+    display: none;
+
+    font-weight: 700;
+}
+
+.model-status {
+    display: flex;
+
+    align-items: center;
+
+    gap: 7px;
+
+    color: var(--muted);
+
+    font-size: 12px;
+}
+
+.status-dot {
+    width: 7px;
+    height: 7px;
+
+    border-radius: 50%;
+
+    background: #20c997;
+
+    box-shadow:
+        0 0 8px rgba(32,201,151,0.7);
+}
+
+.topbar-actions {
+    display: flex;
+
+    align-items: center;
+
+    gap: 6px;
+}
+
+.icon-button {
+    width: 36px;
+    height: 36px;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    border: none;
+
+    border-radius: 9px;
+
+    background: transparent;
+
+    color: #b7bdc9;
+
+    font-size: 17px;
+}
+
+.icon-button:hover {
+    background: var(--panel-hover);
+    color: white;
+}
+
+
+/* ============================================================
+   CHAT AREA
+   ============================================================ */
+
+.chat-area {
+    flex: 1;
+
+    min-height: 0;
+
+    overflow-y: auto;
+
+    scroll-behavior: smooth;
+}
+
+.chat-inner {
+    width: 100%;
+
+    max-width: 900px;
+
+    margin: 0 auto;
+
+    padding: 35px 24px 170px;
+}
+
+
+/* ============================================================
+   WELCOME
+   ============================================================ */
+
+.welcome {
+    min-height: 58vh;
+
+    display: flex;
+
+    flex-direction: column;
+
+    align-items: center;
+
+    justify-content: center;
+
+    text-align: center;
+
+    padding: 30px;
+}
+
+.welcome-icon {
+    width: 70px;
+    height: 70px;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    margin-bottom: 20px;
+
+    border-radius: 22px;
+
+    background:
+        linear-gradient(
+            135deg,
+            #10a37f,
+            #087f63
+        );
+
+    font-size: 31px;
+
+    box-shadow:
+        0 18px 45px rgba(16,163,127,0.22);
+}
+
+.welcome h1 {
+    margin: 0 0 10px;
+
+    font-size: 34px;
+
+    letter-spacing: -1px;
+}
+
+.welcome p {
+    max-width: 530px;
+
+    margin: 0;
+
+    color: var(--muted);
+
+    line-height: 1.6;
+
+    font-size: 15px;
+}
+
+.quick-actions {
+    display: flex;
+
+    flex-wrap: wrap;
+
+    justify-content: center;
+
+    gap: 9px;
+
+    margin-top: 25px;
+}
+
+.quick-action {
+    padding: 10px 14px;
+
+    border: 1px solid var(--border);
+
+    border-radius: 10px;
+
+    background: var(--panel);
+
+    color: #cbd0d9;
+
+    font-size: 13px;
+
+    transition: 0.2s;
+}
+
+.quick-action:hover {
+    background: var(--panel-hover);
+    border-color: #39414f;
+}
+
+
+/* ============================================================
+   CHAT MESSAGES
+   ============================================================ */
+
+.message-row {
+    width: 100%;
+
+    display: flex;
+
+    gap: 13px;
+
+    margin-bottom: 27px;
+
+    animation:
+        messageIn 0.2s ease;
+}
+
+@keyframes messageIn {
+    from {
+        opacity: 0;
+        transform: translateY(5px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.message-row.user {
+    justify-content: flex-end;
+}
+
+.message-avatar {
+    width: 32px;
+    height: 32px;
+
+    flex-shrink: 0;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    border-radius: 9px;
+
+    background:
+        linear-gradient(
+            135deg,
+            #10a37f,
+            #087f63
+        );
+
+    font-size: 13px;
+}
+
+.user-avatar {
+    background: #303642;
+}
+
+.message-content {
+    max-width: 78%;
+
+    line-height: 1.65;
+
+    font-size: 15px;
+
+    white-space: pre-wrap;
+
+    word-break: break-word;
+}
+
+.user .message-content {
+    padding: 12px 15px;
+
+    background: var(--user);
+
+    border-radius: 17px;
+
+    border-bottom-right-radius: 5px;
+
+    color: #f3f4f6;
+}
+
+.assistant-message-content {
+    color: #e4e7ec;
+
+    padding-top: 4px;
+}
+
+.thinking {
+    display: flex;
+
+    align-items: center;
+
+    gap: 5px;
+
+    color: var(--muted);
+}
+
+.thinking span {
+    width: 6px;
+    height: 6px;
+
+    border-radius: 50%;
+
+    background: #89909e;
+
+    animation:
+        typing 1.2s infinite;
+}
+
+.thinking span:nth-child(2) {
+    animation-delay: 0.15s;
+}
+
+.thinking span:nth-child(3) {
+    animation-delay: 0.3s;
+}
+
+@keyframes typing {
+    0%,
+    60%,
+    100% {
+        opacity: 0.25;
+        transform: translateY(0);
+    }
+
+    30% {
+        opacity: 1;
+        transform: translateY(-3px);
+    }
+}
+
+
+/* ============================================================
+   COMPOSER
+   ============================================================ */
+
+.composer-area {
+    position: absolute;
+
+    left: 0;
+    right: 0;
+    bottom: 0;
+
+    padding:
+        20px 20px 16px;
+
+    background:
+        linear-gradient(
+            to top,
+            var(--bg) 65%,
+            rgba(11,13,17,0)
+        );
+
+    pointer-events: none;
+}
+
+.composer-inner {
+    max-width: 900px;
+
+    margin: 0 auto;
+
+    pointer-events: auto;
+}
+
+.composer {
+    display: flex;
+
+    align-items: flex-end;
+
+    gap: 8px;
+
+    padding: 9px;
+
+    background: var(--input);
+
+    border: 1px solid #303642;
+
+    border-radius: 17px;
+
+    box-shadow:
+        0 12px 40px rgba(0,0,0,0.35);
+
+    transition:
+        border-color 0.2s,
+        box-shadow 0.2s;
+}
+
+.composer:focus-within {
+    border-color: #454d5b;
+
+    box-shadow:
+        0 12px 45px rgba(0,0,0,0.42);
+}
+
+.composer textarea {
+    flex: 1;
+
+    min-height: 46px;
+    max-height: 180px;
+
+    resize: none;
+
+    padding: 11px 8px;
+
+    background: transparent;
+
+    color: white;
+
+    border: none;
+
+    outline: none;
+
+    line-height: 1.45;
+
+    font-size: 15px;
+}
+
+.composer textarea::placeholder {
+    color: #737b89;
+}
+
+.composer-button {
+    width: 40px;
+    height: 40px;
+
+    flex-shrink: 0;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    border: none;
+
+    border-radius: 10px;
+
+    background: transparent;
+
+    color: #9299a8;
+
+    font-size: 18px;
+
+    transition: 0.2s;
+}
+
+.composer-button:hover {
+    background: #252b35;
+    color: white;
+}
+
+.send-button {
+    background: #f5f7fa;
+
+    color: #111318;
+}
+
+.send-button:hover {
+    background: white;
+
+    transform: translateY(-1px);
+}
+
+.send-button:disabled {
+    opacity: 0.35;
+
+    cursor: not-allowed;
+
+    transform: none;
+}
+
+.composer-hint {
+    padding-top: 8px;
+
+    text-align: center;
+
+    color: #666e7d;
+
+    font-size: 11px;
+}
+
+
+/* ============================================================
+   TOOL PANEL
+   ============================================================ */
+
+.tool-panel {
+    position: fixed;
+
+    right: 18px;
+    top: 75px;
+
+    width: 360px;
+    max-width: calc(100vw - 36px);
+
+    max-height: calc(100vh - 95px);
+
+    overflow-y: auto;
+
+    padding: 18px;
+
+    background: #151922;
+
+    border: 1px solid var(--border);
+
+    border-radius: 16px;
+
+    box-shadow:
+        0 20px 70px rgba(0,0,0,0.5);
+
+    z-index: 50;
+
+    animation:
+        panelIn 0.2s ease;
+}
+
+@keyframes panelIn {
+    from {
+        opacity: 0;
+        transform: translateY(-7px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.tool-panel-header {
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    margin-bottom: 16px;
+}
+
+.tool-panel-header h3 {
+    margin: 0;
+
+    font-size: 16px;
+}
+
+.close-panel {
+    border: none;
+
+    background: transparent;
+
+    color: var(--muted);
+
+    font-size: 18px;
+}
+
+.panel-section {
+    margin-bottom: 18px;
+
+    padding-bottom: 18px;
+
+    border-bottom: 1px solid var(--border);
+}
+
+.panel-section:last-child {
+    margin-bottom: 0;
+
+    padding-bottom: 0;
+
+    border-bottom: none;
+}
+
+.panel-section h4 {
+    margin: 0 0 7px;
+
+    font-size: 13px;
+}
+
+.panel-section p {
+    margin: 0 0 11px;
+
+    color: var(--muted);
+
+    line-height: 1.5;
+
+    font-size: 12px;
+}
+
+.language-select {
+    width: 100%;
+
+    padding: 11px;
+
+    background: #0e1117;
+
+    color: white;
+
+    border: 1px solid var(--border);
+
+    border-radius: 9px;
+
+    outline: none;
+}
+
+.panel-button-row {
+    display: flex;
+
+    gap: 8px;
+
+    flex-wrap: wrap;
+}
+
+.panel-button {
+    padding: 9px 12px;
+
+    border: none;
+
+    border-radius: 9px;
+
+    background: #252b35;
+
+    color: #e8ebef;
+
+    font-size: 12px;
+
+    font-weight: 600;
+}
+
+.panel-button:hover {
+    background: #303743;
+}
+
+.panel-button.green {
+    background: #087f63;
+    color: white;
+}
+
+.panel-button.red {
+    background: #a92e39;
+    color: white;
+}
+
+.toggle-row {
+    display: flex;
+
+    align-items: center;
+
+    gap: 9px;
+
+    margin-top: 10px;
+
+    color: #cbd0d9;
+
+    font-size: 12px;
+}
+
+.toggle-row input {
+    accent-color: var(--accent);
+}
+
+.panel-file {
+    width: 100%;
+
+    padding: 8px;
+
+    background: #0e1117;
+
+    border: 1px solid var(--border);
+
+    border-radius: 8px;
+
+    color: var(--muted);
+
+    font-size: 11px;
+}
+
+.panel-status {
+    margin-top: 9px;
+
+    color: var(--muted);
+
+    font-size: 11px;
+
+    min-height: 18px;
+}
+
+
+/* ============================================================
+   VISION
+   ============================================================ */
+
+.image-preview {
+    width: 100%;
+
+    max-height: 250px;
+
+    object-fit: contain;
+
+    margin-top: 10px;
+
+    border-radius: 10px;
+
+    background: #080a0d;
+}
+
+.camera-video {
+    width: 100%;
+
+    margin-top: 10px;
+
+    border-radius: 10px;
+
+    background: black;
+}
+
+.document-item {
+    padding: 9px;
+
+    margin-top: 7px;
+
+    border: 1px solid var(--border);
+
+    border-radius: 8px;
+
+    background: #10141b;
+
+    color: #cbd0d9;
+
+    font-size: 11px;
+}
+
+
+/* ============================================================
+   MOBILE
+   ============================================================ */
+
+@media (max-width: 800px) {
+
+    .sidebar {
+        position: fixed;
+
+        left: 0;
+        top: 0;
+
+        z-index: 100;
+
+        box-shadow:
+            15px 0 45px rgba(0,0,0,0.4);
+    }
+
+    .sidebar.collapsed {
+        width: 270px;
+
+        transform: translateX(-100%);
+
+        overflow: visible;
+    }
+
+    .mobile-title {
+        display: block;
+    }
+
+    .model-status {
+        display: none;
+    }
+
+    .chat-inner {
+        padding:
+            25px 15px 155px;
+    }
+
+    .welcome h1 {
+        font-size: 28px;
+    }
+
+    .message-content {
+        max-width: 88%;
+    }
+
+    .composer-area {
+        padding:
+            15px 10px 12px;
+    }
+
+}
+
+
+/* ============================================================
+   CAMERA OVERLAY
+   ============================================================ */
+
+.camera-actions {
+    display: flex;
+
+    gap: 8px;
+
+    margin-top: 10px;
+
+    flex-wrap: wrap;
+}
+
+
+/* ============================================================
+   UTILITY
+   ============================================================ */
+
+.small-text {
+    color: var(--muted);
+
+    font-size: 12px;
+
+    line-height: 1.5;
+}
+
+.status-active {
+    color: #20c997 !important;
+}
+
+</style>
 
 </head>
-
 
 <body>
 
 
-    <div class="header">
+<!-- ============================================================
+     AUTH PAGE
+     ============================================================ -->
 
-        <h1>🤖 The Fix</h1>
+<div id="authPage">
 
-        <div
-            id="accountArea"
-            class="header-right hidden"
-        >
+    <div class="auth-box">
 
-            <span
-                id="usernameDisplay"
-                class="username-display"
-            ></span>
+        <div class="auth-logo">
+            ✦
+        </div>
+
+        <h1>The Fix</h1>
+
+        <p>
+            Your intelligent personal AI assistant
+        </p>
+
+
+        <!-- LOGIN -->
+
+        <div id="loginSection">
+
+            <input
+                id="loginUsername"
+                type="text"
+                placeholder="Username"
+                autocomplete="username"
+            >
+
+            <input
+                id="loginPassword"
+                type="password"
+                placeholder="Password"
+                autocomplete="current-password"
+            >
 
             <button
-                class="logout-button"
-                onclick="logout()"
+                class="main-auth"
+                onclick="login()"
             >
-                Logout
+                Continue
+            </button>
+
+            <div
+                id="loginMessage"
+                class="message"
+            ></div>
+
+            <div class="auth-switch">
+
+                Don't have an account?
+
+                <button onclick="showRegister()">
+                    Create one
+                </button>
+
+            </div>
+
+        </div>
+
+
+        <!-- REGISTER -->
+
+        <div
+            id="registerSection"
+            class="hidden"
+        >
+
+            <input
+                id="registerUsername"
+                type="text"
+                placeholder="Username"
+                autocomplete="username"
+            >
+
+            <input
+                id="registerEmail"
+                type="email"
+                placeholder="Email"
+                autocomplete="email"
+            >
+
+            <input
+                id="registerPassword"
+                type="password"
+                placeholder="Password"
+                autocomplete="new-password"
+            >
+
+            <button
+                class="main-auth"
+                onclick="register()"
+            >
+                Create account
+            </button>
+
+            <div
+                id="registerMessage"
+                class="message"
+            ></div>
+
+            <div class="auth-switch">
+
+                Already have an account?
+
+                <button onclick="showLogin()">
+                    Sign in
+                </button>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+<!-- ============================================================
+     MAIN CHAT PAGE
+     ============================================================ -->
+
+<div
+    id="chatPage"
+    class="hidden"
+>
+
+
+    <!-- SIDEBAR -->
+
+    <aside
+        id="sidebar"
+        class="sidebar"
+    >
+
+        <div class="sidebar-top">
+
+            <div class="brand">
+
+                <div class="brand-icon">
+                    ✦
+                </div>
+
+                <div class="brand-name">
+                    The Fix
+                </div>
+
+            </div>
+
+
+            <button
+                class="new-chat"
+                onclick="newChat()"
+            >
+                <span>＋</span>
+                <span>New chat</span>
             </button>
 
         </div>
 
-    </div>
 
+        <div class="sidebar-section">
 
-    <!-- LOGIN / REGISTER -->
-
-    <div
-        id="authSection"
-        class="container"
-    >
-
-        <div class="auth-card">
-
-            <div class="tabs">
-
-                <button
-                    id="loginTab"
-                    class="tab active"
-                    onclick="showLogin()"
-                >
-                    Login
-                </button>
-
-                <button
-                    id="registerTab"
-                    class="tab"
-                    onclick="showRegister()"
-                >
-                    Register
-                </button>
-
+            <div class="sidebar-label">
+                Workspace
             </div>
 
 
-            <!-- LOGIN -->
-
-            <div id="loginForm">
-
-                <h2>Welcome to The Fix</h2>
-
-                <p>Login to your account</p>
-
-                <div class="form-group">
-
-                    <label>Username</label>
-
-                    <input
-                        id="loginUsername"
-                        type="text"
-                        placeholder="Enter username"
-                    >
-
-                </div>
-
-
-                <div class="form-group">
-
-                    <label>Password</label>
-
-                    <input
-                        id="loginPassword"
-                        type="password"
-                        placeholder="Enter password"
-                    >
-
-                </div>
-
-
-                <button
-                    class="primary-button"
-                    onclick="login()"
-                >
-                    Login
-                </button>
-
-            </div>
-
-
-            <!-- REGISTER -->
-
-            <div
-                id="registerForm"
-                class="hidden"
+            <button
+                class="sidebar-item active"
+                onclick="showMainChat()"
             >
 
-                <h2>Create Account</h2>
+                <span class="sidebar-icon">
+                    💬
+                </span>
 
-                <p>Create your The Fix account</p>
+                <span>
+                    Chat
+                </span>
 
-                <div class="form-group">
+            </button>
 
-                    <label>Username</label>
 
-                    <input
-                        id="registerUsername"
-                        type="text"
-                        placeholder="Choose a username"
-                    >
+            <button
+                class="sidebar-item"
+                onclick="openPanel('memoryPanel')"
+            >
 
+                <span class="sidebar-icon">
+                    🧠
+                </span>
+
+                <span>
+                    Memory
+                </span>
+
+            </button>
+
+
+            <button
+                class="sidebar-item"
+                onclick="openPanel('documentPanel')"
+            >
+
+                <span class="sidebar-icon">
+                    📄
+                </span>
+
+                <span>
+                    Documents
+                </span>
+
+            </button>
+
+
+            <button
+                class="sidebar-item"
+                onclick="openPanel('visionPanel')"
+            >
+
+                <span class="sidebar-icon">
+                    👁
+                </span>
+
+                <span>
+                    Vision
+                </span>
+
+            </button>
+
+
+            <button
+                class="sidebar-item"
+                onclick="openPanel('voicePanel')"
+            >
+
+                <span class="sidebar-icon">
+                    🎤
+                </span>
+
+                <span>
+                    Voice
+                </span>
+
+            </button>
+
+
+            <button
+                class="sidebar-item"
+                onclick="openPanel('languagePanel')"
+            >
+
+                <span class="sidebar-icon">
+                    🌍
+                </span>
+
+                <span>
+                    Language
+                </span>
+
+            </button>
+
+        </div>
+
+
+        <div class="sidebar-bottom">
+
+            <div class="account">
+
+                <div
+                    id="userAvatar"
+                    class="avatar"
+                >
+                    U
                 </div>
 
+                <div class="account-info">
 
-                <div class="form-group">
-
-                    <label>Email</label>
-
-                    <input
-                        id="registerEmail"
-                        type="email"
-                        placeholder="Enter email"
+                    <div
+                        id="sidebarUsername"
+                        class="account-name"
                     >
+                        User
+                    </div>
+
+                    <div class="account-label">
+                        Personal workspace
+                    </div>
 
                 </div>
-
-
-                <div class="form-group">
-
-                    <label>Password</label>
-
-                    <input
-                        id="registerPassword"
-                        type="password"
-                        placeholder="Create password"
-                    >
-
-                </div>
-
 
                 <button
-                    class="primary-button"
-                    onclick="register()"
+                    class="logout-small"
+                    onclick="logout()"
+                    title="Logout"
                 >
-                    Create Account
+                    ⇥
                 </button>
 
             </div>
 
+        </div>
+
+    </aside>
+
+
+    <!-- MAIN -->
+
+    <main class="main-area">
+
+
+        <!-- TOPBAR -->
+
+        <header class="app-topbar">
+
+            <div class="topbar-left">
+
+                <button
+                    class="menu-button"
+                    onclick="toggleSidebar()"
+                    title="Menu"
+                >
+                    ☰
+                </button>
+
+                <div class="mobile-title">
+                    The Fix
+                </div>
+
+                <div class="model-status">
+
+                    <span class="status-dot"></span>
+
+                    <span>
+                        The Fix is online
+                    </span>
+
+                </div>
+
+            </div>
+
+
+            <div class="topbar-actions">
+
+                <button
+                    class="icon-button"
+                    onclick="openPanel('languagePanel')"
+                    title="Language"
+                >
+                    🌍
+                </button>
+
+                <button
+                    class="icon-button"
+                    onclick="openPanel('voicePanel')"
+                    title="Voice"
+                >
+                    🎤
+                </button>
+
+                <button
+                    class="icon-button"
+                    onclick="openPanel('visionPanel')"
+                    title="Vision"
+                >
+                    👁
+                </button>
+
+            </div>
+
+        </header>
+
+
+        <!-- CHAT -->
+
+        <section
+            id="chatArea"
+            class="chat-area"
+        >
 
             <div
-                id="authMessage"
-                class="message"
-            ></div>
+                id="chatInner"
+                class="chat-inner"
+            >
 
-        </div>
+                <div
+                    id="welcome"
+                    class="welcome"
+                >
 
-    </div>
+                    <div class="welcome-icon">
+                        ✦
+                    </div>
+
+                    <h1>
+                        How can I help you?
+                    </h1>
+
+                    <p>
+                        I'm The Fix, your personal AI assistant.
+                        Ask questions, study, analyze documents,
+                        understand images, use your voice, and more.
+                    </p>
 
 
-    <!-- CHAT -->
+                    <div class="quick-actions">
 
-    <div
-        id="chatSection"
-        class="container hidden"
-    >
+                        <button
+                            class="quick-action"
+                            onclick="quickAsk('Explain this in a simple way')"
+                        >
+                            📚 Explain something
+                        </button>
 
-        <div class="chat-card">
+                        <button
+                            class="quick-action"
+                            onclick="openPanel('documentPanel')"
+                        >
+                            📄 Upload document
+                        </button>
+
+                        <button
+                            class="quick-action"
+                            onclick="openPanel('visionPanel')"
+                        >
+                            👁 Analyze image
+                        </button>
+
+                        <button
+                            class="quick-action"
+                            onclick="openPanel('voicePanel')"
+                        >
+                            🎤 Use voice
+                        </button>
+
+                    </div>
+
+                </div>
+
+                <div id="chatBox"></div>
+
+            </div>
+
+        </section>
 
 
-            <div id="chat">
+        <!-- COMPOSER -->
 
-                <div class="chat-message ai-message">
+        <div class="composer-area">
 
-                    Hello! I am The Fix.
-                    How can I help you?
+            <div class="composer-inner">
 
+                <div class="composer">
+
+                    <button
+                        class="composer-button"
+                        onclick="openPanel('documentPanel')"
+                        title="Attach document"
+                    >
+                        ＋
+                    </button>
+
+
+                    <textarea
+                        id="chatInput"
+                        placeholder="Message The Fix..."
+                        rows="1"
+                        onkeydown="handleChatKey(event)"
+                        oninput="autoResizeInput(this)"
+                    ></textarea>
+
+
+                    <button
+                        id="voiceComposerButton"
+                        class="composer-button"
+                        onclick="toggleMicrophone()"
+                        title="Voice input"
+                    >
+                        🎤
+                    </button>
+
+
+                    <button
+                        id="sendButton"
+                        class="composer-button send-button"
+                        onclick="sendMessage()"
+                        title="Send"
+                    >
+                        ↑
+                    </button>
+
+                </div>
+
+
+                <div class="composer-hint">
+                    The Fix can make mistakes. Check important information.
                 </div>
 
             </div>
 
-
-            <!-- CHAT INPUT -->
-
-            <div class="input-area">
-
-                <input
-                    id="messageInput"
-                    type="text"
-                    placeholder="Message The Fix..."
-                    onkeydown="handleEnter(event)"
-                >
-
-                <button
-                    class="send-button"
-                    onclick="sendMessage()"
-                >
-                    Send
-                </button>
-
-            </div>
-
-
-            <!-- DOCUMENT AREA -->
-
-            <div class="upload-area">
-
-                <div class="document-title">
-                    📄 Documents
-                </div>
-
-                <input
-                    id="pdfFile"
-                    type="file"
-                    accept=".pdf,.docx,.pptx,.xlsx,.txt"
-                >
-
-                <button
-                    class="send-button"
-                    onclick="uploadPDF()"
-                >
-                    Upload
-                </button>
-
-
-                <div
-                    id="uploadStatus"
-                ></div>
-
-
-                <div
-                    id="selectedDocument"
-                    class="selected-document hidden"
-                ></div>
-
-
-                <div id="documentList"></div>
-
-            </div>
-
-
         </div>
+
+    </main>
+
+</div>
+
+
+<!-- ============================================================
+     LANGUAGE PANEL
+     ============================================================ -->
+
+<div
+    id="languagePanel"
+    class="tool-panel hidden"
+>
+
+    <div class="tool-panel-header">
+
+        <h3>🌍 Language</h3>
+
+        <button
+            class="close-panel"
+            onclick="closePanels()"
+        >
+            ×
+        </button>
 
     </div>
 
 
-    <script>
+    <div class="panel-section">
+
+        <h4>
+            Response language
+        </h4>
+
+        <p>
+            Choose the language for The Fix's voice and
+            preferred responses.
+        </p>
+
+        <select
+            id="languageSelect"
+            class="language-select"
+            onchange="setLanguage(this.value)"
+        >
+
+            <option value="en-ZA">
+                🇿🇦 English (South Africa)
+            </option>
+
+            <option value="zu-ZA">
+                🇿🇦 isiZulu
+            </option>
+
+            <option value="xh-ZA">
+                🇿🇦 isiXhosa
+            </option>
+
+            <option value="st-ZA">
+                🇿🇦 Sesotho
+            </option>
+
+            <option value="tn-ZA">
+                🇿🇦 Setswana
+            </option>
+
+            <option value="nso-ZA">
+                🇿🇦 Sepedi
+            </option>
+
+            <option value="af-ZA">
+                🇿🇦 Afrikaans
+            </option>
+
+            <option value="ss-ZA">
+                🇿🇦 siSwati
+            </option>
+
+            <option value="ts-ZA">
+                🇿🇦 Xitsonga
+            </option>
+
+            <option value="ve-ZA">
+                🇿🇦 Tshivenda
+            </option>
+
+            <option value="nr-ZA">
+                🇿🇦 isiNdebele
+            </option>
+
+            <option value="en-US">
+                🇺🇸 English
+            </option>
+
+            <option value="fr-FR">
+                🇫🇷 French
+            </option>
+
+            <option value="es-ES">
+                🇪🇸 Spanish
+            </option>
+
+            <option value="pt-PT">
+                🇵🇹 Portuguese
+            </option>
+
+            <option value="de-DE">
+                🇩🇪 German
+            </option>
+
+            <option value="it-IT">
+                🇮🇹 Italian
+            </option>
+
+            <option value="nl-NL">
+                🇳🇱 Dutch
+            </option>
+
+            <option value="ar-SA">
+                🇸🇦 Arabic
+            </option>
+
+            <option value="zh-CN">
+                🇨🇳 Chinese
+            </option>
+
+            <option value="ja-JP">
+                🇯🇵 Japanese
+            </option>
+
+            <option value="ko-KR">
+                🇰🇷 Korean
+            </option>
+
+            <option value="hi-IN">
+                🇮🇳 Hindi
+            </option>
+
+            <option value="ru-RU">
+                🇷🇺 Russian
+            </option>
+
+        </select>
+
+    </div>
+
+</div>
 
 
-        const API_URL =
-            "http://127.0.0.1:8000";
+<!-- ============================================================
+     VOICE PANEL
+     ============================================================ -->
+
+<div
+    id="voicePanel"
+    class="tool-panel hidden"
+>
+
+    <div class="tool-panel-header">
+
+        <h3>🎤 Voice</h3>
+
+        <button
+            class="close-panel"
+            onclick="closePanels()"
+        >
+            ×
+        </button>
+
+    </div>
 
 
-        let currentUser =
-            JSON.parse(
-                localStorage.getItem(
-                    "the_fix_user"
-                )
+    <div class="panel-section">
+
+        <h4>
+            Voice controls
+        </h4>
+
+        <p>
+            Speak to The Fix and optionally have it read
+            answers aloud.
+        </p>
+
+
+        <div class="panel-button-row">
+
+            <button
+                id="micButton"
+                class="panel-button green"
+                onclick="toggleMicrophone()"
+            >
+                🎤 Speak to The Fix
+            </button>
+
+            <button
+                class="panel-button"
+                onclick="stopSpeaking()"
+            >
+                🔇 Stop
+            </button>
+
+        </div>
+
+
+        <div class="toggle-row">
+
+            <input
+                id="speakAnswers"
+                type="checkbox"
+                checked
+            >
+
+            <label for="speakAnswers">
+                Speak The Fix's answers
+            </label>
+
+        </div>
+
+
+        <div class="toggle-row">
+
+            <input
+                id="continuousVoice"
+                type="checkbox"
+            >
+
+            <label for="continuousVoice">
+                Continuous conversation
+            </label>
+
+        </div>
+
+
+        <div
+            id="voiceStatus"
+            class="panel-status"
+        >
+            Ready.
+        </div>
+
+    </div>
+
+</div>
+
+
+<!-- ============================================================
+     VISION PANEL
+     ============================================================ -->
+
+<div
+    id="visionPanel"
+    class="tool-panel hidden"
+>
+
+    <div class="tool-panel-header">
+
+        <h3>👁 Vision</h3>
+
+        <button
+            class="close-panel"
+            onclick="closePanels()"
+        >
+            ×
+        </button>
+
+    </div>
+
+
+    <div class="panel-section">
+
+        <h4>
+            Image analysis
+        </h4>
+
+        <p>
+            Upload an image, screenshot, diagram or question.
+            The Fix can analyze it.
+        </p>
+
+
+        <div class="panel-button-row">
+
+            <button
+                class="panel-button green"
+                onclick="chooseImage()"
+            >
+                🖼 Upload image
+            </button>
+
+            <button
+                class="panel-button"
+                onclick="openCamera()"
+            >
+                📷 Camera
+            </button>
+
+        </div>
+
+
+        <input
+            id="imageInput"
+            class="panel-file"
+            type="file"
+            accept="image/*"
+            style="display:none"
+            onchange="handleImageSelection(event)"
+        >
+
+
+        <div
+            id="imagePreviewBox"
+            class="hidden"
+        >
+
+            <img
+                id="imagePreview"
+                class="image-preview"
+                alt="Selected image"
+            >
+
+
+            <div class="panel-button-row">
+
+                <button
+                    class="panel-button green"
+                    onclick="analyzeSelectedImage()"
+                >
+                    🔍 Ask The Fix
+                </button>
+
+                <button
+                    class="panel-button red"
+                    onclick="removeSelectedImage()"
+                >
+                    Remove
+                </button>
+
+            </div>
+
+        </div>
+
+
+        <div
+            id="cameraBox"
+            class="hidden"
+        >
+
+            <video
+                id="cameraVideo"
+                class="camera-video"
+                autoplay
+                playsinline
+            ></video>
+
+            <canvas
+                id="cameraCanvas"
+                style="display:none"
+            ></canvas>
+
+
+            <div class="camera-actions">
+
+                <button
+                    class="panel-button green"
+                    onclick="takePicture()"
+                >
+                    📸 Take picture
+                </button>
+
+                <button
+                    class="panel-button red"
+                    onclick="closeCamera()"
+                >
+                    Close
+                </button>
+
+            </div>
+
+        </div>
+
+
+        <div
+            id="visionStatus"
+            class="panel-status"
+        ></div>
+
+    </div>
+
+</div>
+
+
+<!-- ============================================================
+     DOCUMENT PANEL
+     ============================================================ -->
+
+<div
+    id="documentPanel"
+    class="tool-panel hidden"
+>
+
+    <div class="tool-panel-header">
+
+        <h3>📄 Documents</h3>
+
+        <button
+            class="close-panel"
+            onclick="closePanels()"
+        >
+            ×
+        </button>
+
+    </div>
+
+
+    <div class="panel-section">
+
+        <h4>
+            Upload a document
+        </h4>
+
+        <p>
+            PDF, DOCX, PPTX, XLSX and TXT files are supported.
+        </p>
+
+
+        <input
+            id="documentInput"
+            class="panel-file"
+            type="file"
+            accept=".pdf,.docx,.pptx,.xlsx,.txt"
+        >
+
+
+        <div class="panel-button-row">
+
+            <button
+                class="panel-button green"
+                onclick="uploadDocument()"
+            >
+                📤 Upload
+            </button>
+
+        </div>
+
+
+        <div
+            id="documentStatus"
+            class="panel-status"
+        ></div>
+
+
+        <div
+            id="documentList"
+        ></div>
+
+    </div>
+
+</div>
+
+
+<!-- ============================================================
+     MEMORY PANEL
+     ============================================================ -->
+
+<div
+    id="memoryPanel"
+    class="tool-panel hidden"
+>
+
+    <div class="tool-panel-header">
+
+        <h3>🧠 Memory</h3>
+
+        <button
+            class="close-panel"
+            onclick="closePanels()"
+        >
+            ×
+        </button>
+
+    </div>
+
+
+    <div class="panel-section">
+
+        <h4>
+            What The Fix remembers
+        </h4>
+
+        <p>
+            Useful information saved for your personal AI.
+        </p>
+
+
+        <button
+            class="panel-button"
+            onclick="loadMemory()"
+        >
+            ↻ Refresh memory
+        </button>
+
+
+        <div
+            id="memoryDisplay"
+            style="margin-top:10px"
+        ></div>
+
+    </div>
+
+</div>
+
+
+<script>
+
+/* ============================================================
+   CONFIGURATION
+   ============================================================ */
+
+const API_URL =
+    window.location.origin;
+
+
+/* ============================================================
+   GLOBAL STATE
+   ============================================================ */
+
+let currentUser = null;
+
+let selectedImageFile = null;
+
+let cameraStream = null;
+
+let recognition = null;
+
+let isListening = false;
+
+let isProcessingVoice = false;
+
+let selectedLanguage =
+    localStorage.getItem(
+        "the_fix_language"
+    ) || "en-ZA";
+
+
+/* ============================================================
+   LANGUAGE NAMES
+   ============================================================ */
+
+const LANGUAGE_NAMES = {
+
+    "en-ZA": "English (South Africa)",
+    "zu-ZA": "isiZulu",
+    "xh-ZA": "isiXhosa",
+    "st-ZA": "Sesotho",
+    "tn-ZA": "Setswana",
+    "nso-ZA": "Sepedi",
+    "af-ZA": "Afrikaans",
+    "ss-ZA": "siSwati",
+    "ts-ZA": "itsonga",
+    "ve-ZA": "Tshivenda",
+    "nr-ZA": "isiNdebele",
+
+    "en-US": "English",
+    "fr-FR": "French",
+    "es-ES": "Spanish",
+    "pt-PT": "Portuguese",
+    "de-DE": "German",
+    "it-IT": "Italian",
+    "nl-NL": "Dutch",
+    "ar-SA": "Arabic",
+    "zh-CN": "Chinese",
+    "ja-JP": "Japanese",
+    "ko-KR": "Korean",
+    "hi-IN": "Hindi",
+    "ru-RU": "Russian"
+
+};
+
+
+/* ============================================================
+   AUTH
+   ============================================================ */
+
+function showLogin() {
+
+    document
+        .getElementById("loginSection")
+        .classList.remove("hidden");
+
+    document
+        .getElementById("registerSection")
+        .classList.add("hidden");
+
+}
+
+
+function showRegister() {
+
+    document
+        .getElementById("loginSection")
+        .classList.add("hidden");
+
+    document
+        .getElementById("registerSection")
+        .classList.remove("hidden");
+
+}
+
+
+function showMessage(
+    elementId,
+    message,
+    success = false
+) {
+
+    const element =
+        document.getElementById(
+            elementId
+        );
+
+    element.style.display = "block";
+
+    element.textContent = message;
+
+    element.style.background =
+        success
+            ? "#123b31"
+            : "#421d23";
+
+    element.style.color =
+        success
+            ? "#6ee7c5"
+            : "#ff9ba5";
+
+}
+
+
+/* ============================================================
+   REGISTER
+   ============================================================ */
+
+async function register() {
+
+    const username =
+        document
+            .getElementById(
+                "registerUsername"
+            )
+            .value
+            .trim();
+
+    const email =
+        document
+            .getElementById(
+                "registerEmail"
+            )
+            .value
+            .trim();
+
+    const password =
+        document
+            .getElementById(
+                "registerPassword"
+            )
+            .value;
+
+
+    if (
+        !username ||
+        !email ||
+        !password
+    ) {
+
+        showMessage(
+            "registerMessage",
+            "Please complete all fields."
+        );
+
+        return;
+    }
+
+
+    try {
+
+        const response =
+            await fetch(
+                API_URL + "/register",
+                {
+
+                    method: "POST",
+
+                    headers: {
+                        "Content-Type":
+                            "application/json"
+                    },
+
+                    body: JSON.stringify({
+                        username,
+                        email,
+                        password
+                    })
+
+                }
             );
 
 
-        let selectedDocument = null;
+        const data =
+            await response.json();
 
 
-        /*
-        ==========================================================
-        AUTH MESSAGE
-        ==========================================================
-        */
+        if (!response.ok) {
 
-        function showMessage(
-            message,
-            type
-        ) {
-
-            const element =
-                document.getElementById(
-                    "authMessage"
-                );
-
-            element.textContent =
-                message;
-
-            element.className =
-                "message " + type;
-
-        }
-
-
-        /*
-        ==========================================================
-        SHOW LOGIN
-        ==========================================================
-        */
-
-        function showLogin() {
-
-            document
-                .getElementById(
-                    "loginForm"
-                )
-                .classList
-                .remove("hidden");
-
-            document
-                .getElementById(
-                    "registerForm"
-                )
-                .classList
-                .add("hidden");
-
-            document
-                .getElementById(
-                    "loginTab"
-                )
-                .classList
-                .add("active");
-
-            document
-                .getElementById(
-                    "registerTab"
-                )
-                .classList
-                .remove("active");
-
-            document
-                .getElementById(
-                    "authMessage"
-                )
-                .className =
-                "message";
-
-        }
-
-
-        /*
-        ==========================================================
-        SHOW REGISTER
-        ==========================================================
-        */
-
-        function showRegister() {
-
-            document
-                .getElementById(
-                    "loginForm"
-                )
-                .classList
-                .add("hidden");
-
-            document
-                .getElementById(
-                    "registerForm"
-                )
-                .classList
-                .remove("hidden");
-
-            document
-                .getElementById(
-                    "loginTab"
-                )
-                .classList
-                .remove("active");
-
-            document
-                .getElementById(
-                    "registerTab"
-                )
-                .classList
-                .add("active");
-
-            document
-                .getElementById(
-                    "authMessage"
-                )
-                .className =
-                "message";
-
-        }
-
-
-        /*
-        ==========================================================
-        REGISTER
-        ==========================================================
-        */
-
-        async function register() {
-
-            const username =
-                document
-                    .getElementById(
-                        "registerUsername"
-                    )
-                    .value
-                    .trim();
-
-            const email =
-                document
-                    .getElementById(
-                        "registerEmail"
-                    )
-                    .value
-                    .trim();
-
-            const password =
-                document
-                    .getElementById(
-                        "registerPassword"
-                    )
-                    .value;
-
-
-            if (
-                !username ||
-                !email ||
-                !password
-            ) {
-
-                showMessage(
-                    "Please complete all fields.",
-                    "error"
-                );
-
-                return;
-
-            }
-
-
-            try {
-
-                const response =
-                    await fetch(
-                        API_URL +
-                        "/register",
-                        {
-                            method: "POST",
-
-                            headers: {
-                                "Content-Type":
-                                    "application/json"
-                            },
-
-                            body:
-                                JSON.stringify({
-                                    username,
-                                    email,
-                                    password
-                                })
-                        }
-                    );
-
-
-                const data =
-                    await response.json();
-
-
-                if (
-                    !response.ok ||
-                    data.success !== true
-                ) {
-
-                    showMessage(
-                        data.error ||
-                        data.detail ||
-                        "Registration failed.",
-                        "error"
-                    );
-
-                    return;
-
-                }
-
-
-                showMessage(
-                    "Account created successfully. You can now log in.",
-                    "success"
-                );
-
-
-                document
-                    .getElementById(
-                        "loginUsername"
-                    )
-                    .value =
-                    username;
-
-
-                document
-                    .getElementById(
-                        "loginPassword"
-                    )
-                    .value =
-                    "";
-
-
-                showLogin();
-
-            }
-
-
-            catch (error) {
-
-                console.error(
-                    "Registration error:",
-                    error
-                );
-
-                showMessage(
-                    "Could not connect to The Fix.",
-                    "error"
-                );
-
-            }
-
-        }
-
-
-        /*
-        ==========================================================
-        LOGIN
-        ==========================================================
-        */
-
-        async function login() {
-
-            const username =
-                document
-                    .getElementById(
-                        "loginUsername"
-                    )
-                    .value
-                    .trim();
-
-            const password =
-                document
-                    .getElementById(
-                        "loginPassword"
-                    )
-                    .value;
-
-
-            if (
-                !username ||
-                !password
-            ) {
-
-                showMessage(
-                    "Enter your username and password.",
-                    "error"
-                );
-
-                return;
-
-            }
-
-
-            try {
-
-                const response =
-                    await fetch(
-                        API_URL +
-                        "/login",
-                        {
-                            method: "POST",
-
-                            headers: {
-                                "Content-Type":
-                                    "application/json"
-                            },
-
-                            body:
-                                JSON.stringify({
-                                    username,
-                                    password
-                                })
-                        }
-                    );
-
-
-                const data =
-                    await response.json();
-
-
-                if (
-                    !response.ok ||
-                    data.success !== true
-                ) {
-
-                    showMessage(
-                        data.error ||
-                        data.detail ||
-                        "Login failed.",
-                        "error"
-                    );
-
-                    return;
-
-                }
-
-
-                currentUser =
-                    data.user;
-
-
-                localStorage.setItem(
-                    "the_fix_user",
-                    JSON.stringify(
-                        currentUser
-                    )
-                );
-
-
-                showChat();
-
-            }
-
-
-            catch (error) {
-
-                console.error(
-                    "Login error:",
-                    error
-                );
-
-                showMessage(
-                    "Could not connect to The Fix.",
-                    "error"
-                );
-
-            }
-
-        }
-
-
-        /*
-        ==========================================================
-        SHOW CHAT
-        ==========================================================
-        */
-
-        function showChat() {
-
-            document
-                .getElementById(
-                    "authSection"
-                )
-                .classList
-                .add("hidden");
-
-
-            document
-                .getElementById(
-                    "chatSection"
-                )
-                .classList
-                .remove("hidden");
-
-
-            document
-                .getElementById(
-                    "accountArea"
-                )
-                .classList
-                .remove("hidden");
-
-
-            document
-                .getElementById(
-                    "usernameDisplay"
-                )
-                .textContent =
-                "Logged in as " +
-                currentUser.username;
-
-
-            loadDocuments();
-
-        }
-
-
-        /*
-        ==========================================================
-        LOGOUT
-        ==========================================================
-        */
-
-        function logout() {
-
-            currentUser =
-                null;
-
-            selectedDocument =
-                null;
-
-            localStorage.removeItem(
-                "the_fix_user"
+            throw new Error(
+                data.detail ||
+                "Registration failed."
             );
 
-            location.reload();
-
         }
 
 
-        /*
-        ==========================================================
-        ENTER KEY
-        ==========================================================
-        */
-
-        function handleEnter(event) {
-
-            if (
-                event.key ===
-                "Enter"
-            ) {
-
-                sendMessage();
-
-            }
-
-        }
+        showMessage(
+            "registerMessage",
+            "Registration successful. You can now log in.",
+            true
+        );
 
 
-        /*
-        ==========================================================
-        ADD CHAT MESSAGE
-        ==========================================================
-        */
-
-        function addMessage(
-            text,
-            type
-        ) {
-
-            const chat =
-                document.getElementById(
-                    "chat"
-                );
+        setTimeout(
+            showLogin,
+            1000
+        );
 
 
-            const message =
-                document.createElement(
-                    "div"
-                );
+    } catch (error) {
+
+        showMessage(
+            "registerMessage",
+            error.message
+        );
+
+    }
+
+}
 
 
-            message.className =
-                "chat-message " +
-                type;
+/* ============================================================
+   LOGIN
+   ============================================================ */
+
+async function login() {
+
+    const username =
+        document
+            .getElementById(
+                "loginUsername"
+            )
+            .value
+            .trim();
+
+    const password =
+        document
+            .getElementById(
+                "loginPassword"
+            )
+            .value;
 
 
-            message.textContent =
-                text;
+    if (
+        !username ||
+        !password
+    ) {
+
+        showMessage(
+            "loginMessage",
+            "Please enter your username and password."
+        );
+
+        return;
+    }
 
 
-            chat.appendChild(
-                message
+    try {
+
+        const response =
+            await fetch(
+                API_URL + "/login",
+                {
+
+                    method: "POST",
+
+                    headers: {
+                        "Content-Type":
+                            "application/json"
+                    },
+
+                    body: JSON.stringify({
+                        username,
+                        password
+                    })
+
+                }
             );
 
 
-            chat.scrollTop =
-                chat.scrollHeight;
+        const data =
+            await response.json();
 
 
-            return message;
+        if (!response.ok) {
 
-        }
-
-
-        /*
-        ==========================================================
-        SEND MESSAGE
-        ==========================================================
-        */
-
-        async function sendMessage() {
-
-            if (!currentUser) {
-
-                return;
-
-            }
-
-
-            const input =
-                document.getElementById(
-                    "messageInput"
-                );
-
-
-            const message =
-                input.value.trim();
-
-
-            if (!message) {
-
-                return;
-
-            }
-
-
-            addMessage(
-                message,
-                "user-message"
+            throw new Error(
+                data.detail ||
+                "Login failed."
             );
 
-
-            input.value = "";
-
-
-            const thinkingMessage =
-                addMessage(
-                    "The Fix is thinking...",
-                    "ai-message"
-                );
-
-
-            try {
-
-                let response;
-
-
-                /*
-                If a document is selected,
-                ask the document-question endpoint.
-                */
-
-                if (selectedDocument) {
-
-                    response =
-                        await fetch(
-                            API_URL +
-                            "/pdf-question",
-                            {
-                                method: "POST",
-
-                                headers: {
-                                    "Content-Type":
-                                        "application/json"
-                                },
-
-                                body:
-                                    JSON.stringify({
-                                        question:
-                                            message,
-
-                                        user_id:
-                                            currentUser.user_id,
-
-                                        filename:
-                                            selectedDocument
-                                    })
-                            }
-                        );
-
-                }
-
-
-                /*
-                Otherwise use normal chat.
-                */
-
-                else {
-
-                    response =
-                        await fetch(
-                            API_URL +
-                            "/chat",
-                            {
-                                method: "POST",
-
-                                headers: {
-                                    "Content-Type":
-                                        "application/json"
-                                },
-
-                                body:
-                                    JSON.stringify({
-                                        message,
-
-                                        user_id:
-                                            currentUser.user_id
-                                    })
-                            }
-                        );
-
-                }
-
-
-                const data =
-                    await response.json();
-
-
-                if (
-                    data.answer
-                ) {
-
-                    thinkingMessage.textContent =
-                        data.answer;
-
-                }
-
-
-                else if (
-                    data.error
-                ) {
-
-                    thinkingMessage.textContent =
-                        "Error: " +
-                        data.error;
-
-                }
-
-
-                else if (
-                    data.detail
-                ) {
-
-                    thinkingMessage.textContent =
-                        "Error: " +
-                        data.detail;
-
-                }
-
-
-                else {
-
-                    thinkingMessage.textContent =
-                        "The Fix could not process that request.";
-
-                }
-
-            }
-
-
-            catch (error) {
-
-                console.error(
-                    "Chat error:",
-                    error
-                );
-
-                thinkingMessage.textContent =
-                    "Could not connect to The Fix.";
-
-            }
-
         }
 
 
-        /*
-        ==========================================================
-        UPLOAD DOCUMENT
-        ==========================================================
-        */
+        currentUser =
+            data.user;
 
-        async function uploadPDF() {
 
-            if (!currentUser) {
+        localStorage.setItem(
+            "the_fix_user",
+            JSON.stringify(
+                currentUser
+            )
+        );
 
-                return;
+
+        showChat();
+
+
+    } catch (error) {
+
+        showMessage(
+            "loginMessage",
+            error.message
+        );
+
+    }
+
+}
+
+
+/* ============================================================
+   SHOW CHAT
+   ============================================================ */
+
+function showChat() {
+
+    document
+        .getElementById("authPage")
+        .classList.add("hidden");
+
+    document
+        .getElementById("chatPage")
+        .classList.remove("hidden");
+
+
+    const username =
+        currentUser?.username ||
+        "User";
+
+
+    document
+        .getElementById(
+            "sidebarUsername"
+        )
+        .textContent =
+            username;
+
+
+    document
+        .getElementById(
+            "userAvatar"
+        )
+        .textContent =
+            username
+                .charAt(0)
+                .toUpperCase();
+
+
+    const languageSelect =
+        document.getElementById(
+            "languageSelect"
+        );
+
+
+    if (languageSelect) {
+
+        languageSelect.value =
+            selectedLanguage;
+
+    }
+
+
+    initializeSpeechRecognition();
+
+    loadConversation();
+
+    loadMemory();
+
+    loadDocuments();
+
+}
+
+
+/* ============================================================
+   LOGOUT
+   ============================================================ */
+
+function logout() {
+
+    stopSpeaking();
+
+    stopListening();
+
+    closeCamera();
+
+    localStorage.removeItem(
+        "the_fix_user"
+    );
+
+    currentUser = null;
+
+    document
+        .getElementById("chatPage")
+        .classList.add("hidden");
+
+    document
+        .getElementById("authPage")
+        .classList.remove("hidden");
+
+}
+
+
+/* ============================================================
+   SIDEBAR
+   ============================================================ */
+
+function toggleSidebar() {
+
+    const sidebar =
+        document.getElementById(
+            "sidebar"
+        );
+
+    sidebar.classList.toggle(
+        "collapsed"
+    );
+
+}
+
+
+function closeMobileSidebar() {
+
+    if (
+        window.innerWidth <= 800
+    ) {
+
+        document
+            .getElementById(
+                "sidebar"
+            )
+            .classList.add(
+                "collapsed"
+            );
+
+    }
+
+}
+
+
+/* ============================================================
+   PANELS
+   ============================================================ */
+
+function closePanels() {
+
+    document
+        .querySelectorAll(
+            ".tool-panel"
+        )
+        .forEach(
+            panel => {
+                panel.classList.add(
+                    "hidden"
+                );
+            }
+        );
+
+}
+
+
+function openPanel(id) {
+
+    closePanels();
+
+    const panel =
+        document.getElementById(id);
+
+    if (panel) {
+
+        panel.classList.remove(
+            "hidden"
+        );
+
+    }
+
+}
+
+
+function showMainChat() {
+
+    closePanels();
+
+    closeMobileSidebar();
+
+}
+
+
+/* ============================================================
+   NEW CHAT
+   ============================================================ */
+
+function newChat() {
+
+    const chatBox =
+        document.getElementById(
+            "chatBox"
+        );
+
+    chatBox.innerHTML = "";
+
+
+    const welcome =
+        document.getElementById(
+            "welcome"
+        );
+
+    if (welcome) {
+
+        welcome.classList.remove(
+            "hidden"
+        );
+
+    }
+
+
+    document
+        .getElementById(
+            "chatInput"
+        )
+        .focus();
+
+
+    closeMobileSidebar();
+
+}
+
+
+/* ============================================================
+   LANGUAGE
+   ============================================================ */
+
+function setLanguage(
+    language
+) {
+
+    if (
+        !LANGUAGE_NAMES[language]
+    ) {
+
+        language =
+            "en-ZA";
+
+    }
+
+
+    selectedLanguage =
+        language;
+
+
+    localStorage.setItem(
+        "the_fix_language",
+        selectedLanguage
+    );
+
+
+    if (recognition) {
+
+        recognition.lang =
+            selectedLanguage;
+
+    }
+
+
+    const status =
+        document.getElementById(
+            "voiceStatus"
+        );
+
+
+    if (status) {
+
+        status.textContent =
+            "Language selected: " +
+            LANGUAGE_NAMES[
+                selectedLanguage
+            ];
+
+    }
+
+
+    stopSpeaking();
+
+}
+
+
+/* ============================================================
+   SPEECH RECOGNITION
+   ============================================================ */
+
+function initializeSpeechRecognition() {
+
+    const SpeechRecognition =
+        window.SpeechRecognition ||
+        window.webkitSpeechRecognition;
+
+
+    if (!SpeechRecognition) {
+
+        recognition = null;
+
+        const status =
+            document.getElementById(
+                "voiceStatus"
+            );
+
+        if (status) {
+
+            status.textContent =
+                "Speech recognition is not supported by this browser.";
+
+        }
+
+        return;
+
+    }
+
+
+    recognition =
+        new SpeechRecognition();
+
+
+    recognition.continuous =
+        false;
+
+    recognition.interimResults =
+        true;
+
+    recognition.lang =
+        selectedLanguage;
+
+
+    recognition.onstart =
+        function() {
+
+            isListening = true;
+
+            isProcessingVoice = false;
+
+
+            const button =
+                document.getElementById(
+                    "micButton"
+                );
+
+
+            if (button) {
+
+                button.textContent =
+                    "🔴 Listening...";
 
             }
 
 
-            const fileInput =
+            const composerButton =
                 document.getElementById(
-                    "pdfFile"
+                    "voiceComposerButton"
                 );
+
+
+            if (composerButton) {
+
+                composerButton.textContent =
+                    "🔴";
+
+            }
 
 
             const status =
                 document.getElementById(
-                    "uploadStatus"
+                    "voiceStatus"
+                );
+
+
+            if (status) {
+
+                status.classList.add(
+                    "status-active"
+                );
+
+                status.textContent =
+                    "Listening in " +
+                    LANGUAGE_NAMES[
+                        selectedLanguage
+                    ] +
+                    "...";
+
+            }
+
+        };
+
+
+    recognition.onresult =
+        async function(event) {
+
+            let transcript = "";
+
+            let finalResult =
+                false;
+
+
+            for (
+                let i =
+                    event.resultIndex;
+                i <
+                    event.results.length;
+                i++
+            ) {
+
+                transcript +=
+                    event
+                        .results[i][0]
+                        .transcript;
+
+
+                if (
+                    event
+                        .results[i]
+                        .isFinal
+                ) {
+
+                    finalResult =
+                        true;
+
+                }
+
+            }
+
+
+            transcript =
+                transcript.trim();
+
+
+            if (!transcript) {
+
+                return;
+
+            }
+
+
+            document
+                .getElementById(
+                    "chatInput"
+                )
+                .value =
+                    transcript;
+
+
+            autoResizeInput(
+                document.getElementById(
+                    "chatInput"
+                )
+            );
+
+
+            if (finalResult) {
+
+                stopListening();
+
+                isProcessingVoice =
+                    true;
+
+
+                await askTheFix(
+                    transcript,
+                    true,
+                    true,
+                    true
+                );
+
+
+                isProcessingVoice =
+                    false;
+
+            }
+
+        };
+
+
+    recognition.onerror =
+        function(event) {
+
+            isListening = false;
+
+            isProcessingVoice = false;
+
+
+            let message =
+                "Microphone error.";
+
+
+            if (
+                event.error ===
+                "not-allowed"
+            ) {
+
+                message =
+                    "Microphone permission was denied.";
+
+            } else if (
+                event.error ===
+                "no-speech"
+            ) {
+
+                message =
+                    "No speech was detected.";
+
+            } else if (
+                event.error ===
+                "audio-capture"
+            ) {
+
+                message =
+                    "No microphone was found.";
+
+            } else if (
+                event.error ===
+                "network"
+            ) {
+
+                message =
+                    "Speech recognition network error.";
+
+            }
+
+
+            const status =
+                document.getElementById(
+                    "voiceStatus"
+                );
+
+
+            if (status) {
+
+                status.textContent =
+                    message;
+
+            }
+
+        };
+
+
+    recognition.onend =
+        function() {
+
+            isListening = false;
+
+
+            const button =
+                document.getElementById(
+                    "micButton"
+                );
+
+
+            if (button) {
+
+                button.textContent =
+                    "🎤 Speak to The Fix";
+
+            }
+
+
+            const composerButton =
+                document.getElementById(
+                    "voiceComposerButton"
+                );
+
+
+            if (composerButton) {
+
+                composerButton.textContent =
+                    "🎤";
+
+            }
+
+        };
+
+}
+
+
+/* ============================================================
+   MICROPHONE
+   ============================================================ */
+
+function toggleMicrophone() {
+
+    if (!recognition) {
+
+        initializeSpeechRecognition();
+
+    }
+
+
+    if (!recognition) {
+
+        return;
+
+    }
+
+
+    if (isListening) {
+
+        stopListening();
+
+        return;
+
+    }
+
+
+    stopSpeaking();
+
+
+    recognition.lang =
+        selectedLanguage;
+
+
+    try {
+
+        recognition.start();
+
+    } catch (error) {
+
+        console.log(
+            "Speech recognition:",
+            error
+        );
+
+    }
+
+}
+
+
+function stopListening() {
+
+    if (
+        recognition &&
+        isListening
+    ) {
+
+        try {
+
+            recognition.stop();
+
+        } catch (error) {
+
+            console.log(error);
+
+        }
+
+    }
+
+
+    isListening = false;
+
+}
+
+
+/* ============================================================
+   TEXT TO SPEECH
+   ============================================================ */
+
+function speakText(text) {
+
+    const checkbox =
+        document.getElementById(
+            "speakAnswers"
+        );
+
+
+    if (
+        !text ||
+        !checkbox ||
+        !checkbox.checked
+    ) {
+
+        return;
+
+    }
+
+
+    if (
+        !window.speechSynthesis
+    ) {
+
+        return;
+
+    }
+
+
+    stopSpeaking();
+
+
+    let cleanText =
+        String(text);
+
+
+    cleanText =
+        cleanText.replace(
+            /https?:\/\/\S+/gi,
+            ""
+        );
+
+
+    cleanText =
+        cleanText.replace(
+            /```[\s\S]*?```/g,
+            "Code block."
+        );
+
+
+    const utterance =
+        new SpeechSynthesisUtterance(
+            cleanText
+        );
+
+
+    utterance.lang =
+        selectedLanguage;
+
+    utterance.rate =
+        1;
+
+    utterance.pitch =
+        1;
+
+    utterance.volume =
+        1;
+
+
+    const voices =
+        window.speechSynthesis
+            .getVoices();
+
+
+    const languageCode =
+        selectedLanguage
+            .split("-")[0]
+            .toLowerCase();
+
+
+    const exactVoice =
+        voices.find(
+            voice =>
+                voice.lang &&
+                voice.lang
+                    .toLowerCase() ===
+                selectedLanguage
+                    .toLowerCase()
+        );
+
+
+    const partialVoice =
+        voices.find(
+            voice =>
+                voice.lang &&
+                voice.lang
+                    .toLowerCase()
+                    .startsWith(
+                        languageCode
+                    )
+        );
+
+
+    if (exactVoice) {
+
+        utterance.voice =
+            exactVoice;
+
+    } else if (
+        partialVoice
+    ) {
+
+        utterance.voice =
+            partialVoice;
+
+    }
+
+
+    utterance.onstart =
+        function() {
+
+            const status =
+                document.getElementById(
+                    "voiceStatus"
+                );
+
+            if (status) {
+
+                status.textContent =
+                    "🔊 The Fix is speaking...";
+
+            }
+
+        };
+
+
+    utterance.onend =
+        function() {
+
+            const status =
+                document.getElementById(
+                    "voiceStatus"
+                );
+
+            if (status) {
+
+                status.textContent =
+                    "Ready.";
+
+            }
+
+
+            const continuous =
+                document.getElementById(
+                    "continuousVoice"
                 );
 
 
             if (
-                !fileInput.files.length
+                continuous &&
+                continuous.checked &&
+                currentUser
             ) {
 
-                status.textContent =
-                    "Please select a document.";
+                setTimeout(
+                    function() {
 
-                return;
+                        if (
+                            !isListening &&
+                            !isProcessingVoice
+                        ) {
 
-            }
+                            toggleMicrophone();
 
+                        }
 
-            const file =
-                fileInput.files[0];
-
-
-            const allowedTypes = [
-                ".pdf",
-                ".docx",
-                ".pptx",
-                ".xlsx",
-                ".txt"
-            ];
-
-
-            const fileName =
-                file.name.toLowerCase();
-
-
-            const supported =
-                allowedTypes.some(
-                    extension =>
-                        fileName.endsWith(
-                            extension
-                        )
+                    },
+                    500
                 );
 
-
-            if (!supported) {
-
-                status.textContent =
-                    "Supported files: PDF, DOCX, PPTX, XLSX and TXT.";
-
-                return;
-
             }
 
-
-            const formData =
-                new FormData();
+        };
 
 
-            formData.append(
-                "file",
-                file
+    window.speechSynthesis
+        .speak(
+            utterance
+        );
+
+}
+
+
+function stopSpeaking() {
+
+    if (
+        window.speechSynthesis
+    ) {
+
+        window.speechSynthesis
+            .cancel();
+
+    }
+
+}
+
+
+/* ============================================================
+   ASK THE FIX
+   ============================================================ */
+
+async function askTheFix(
+    message,
+    speakAnswer = false,
+    displayUser = true,
+    fromVoice = false
+) {
+
+    message =
+        String(
+            message || ""
+        ).trim();
+
+
+    if (!message) {
+
+        return null;
+
+    }
+
+
+    if (!currentUser) {
+
+        return null;
+
+    }
+
+
+    const welcome =
+        document.getElementById(
+            "welcome"
+        );
+
+
+    if (welcome) {
+
+        welcome.classList.add(
+            "hidden"
+        );
+
+    }
+
+
+    if (displayUser) {
+
+        addUserMessage(
+            message
+        );
+
+    }
+
+
+    const temporary =
+        addAssistantMessage(
+            ""
+        );
+
+
+    temporary.innerHTML =
+        `
+        <div class="thinking">
+            <span></span>
+            <span></span>
+            <span></span>
+        </div>
+        `;
+
+
+    const sendButton =
+        document.getElementById(
+            "sendButton"
+        );
+
+
+    if (sendButton) {
+
+        sendButton.disabled =
+            true;
+
+    }
+
+
+    try {
+
+        const response =
+            await fetch(
+                API_URL + "/chat",
+                {
+
+                    method: "POST",
+
+                    headers: {
+                        "Content-Type":
+                            "application/json"
+                    },
+
+                    body: JSON.stringify({
+
+                        user_id:
+                            currentUser.user_id,
+
+                        message:
+                            message,
+
+                        language:
+                            selectedLanguage
+
+                    })
+
+                }
             );
 
 
+        const data =
+            await response.json();
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                data.detail ||
+                "The Fix could not respond."
+            );
+
+        }
+
+
+        const answer =
+            data.answer ||
+            "The Fix did not return an answer.";
+
+
+        temporary.textContent =
+            answer;
+
+
+        if (
+            speakAnswer ||
+            fromVoice
+        ) {
+
+            speakText(
+                answer
+            );
+
+        }
+
+
+        scrollChat();
+
+
+        return answer;
+
+
+    } catch (error) {
+
+        temporary.textContent =
+            "Error: " +
+            error.message;
+
+
+        const status =
+            document.getElementById(
+                "voiceStatus"
+            );
+
+
+        if (status) {
+
             status.textContent =
-                "Uploading and reading document...";
+                "The Fix error: " +
+                error.message;
+
+        }
 
 
-            try {
-
-                const response =
-                    await fetch(
-                        API_URL +
-                        "/upload-pdf",
-                        {
-                            method: "POST",
-                            body: formData
-                        }
-                    );
+        return null;
 
 
-                const data =
-                    await response.json();
+    } finally {
+
+        if (sendButton) {
+
+            sendButton.disabled =
+                false;
+
+        }
+
+    }
+
+}
 
 
-                if (
-                    response.ok &&
-                    data.success === true
-                ) {
+/* ============================================================
+   SEND MESSAGE
+   ============================================================ */
 
-                    selectedDocument =
-                        data.stored_filename;
+async function sendMessage() {
 
-
-                    status.textContent =
-                        "Document uploaded successfully. " +
-                        data.characters +
-                        " characters extracted.";
+    const input =
+        document.getElementById(
+            "chatInput"
+        );
 
 
-                    updateSelectedDocument();
+    const message =
+        input.value.trim();
 
 
-                    await loadDocuments();
+    if (!message) {
+
+        return;
+
+    }
 
 
-                    fileInput.value = "";
+    input.value = "";
 
-                }
-
-
-                else {
-
-                    status.textContent =
-                        data.detail ||
-                        data.error ||
-                        "Document upload failed.";
-
-                }
-
-            }
+    autoResizeInput(
+        input
+    );
 
 
-            catch (error) {
+    await askTheFix(
+        message,
+        false,
+        true,
+        false
+    );
 
-                console.error(
-                    "Document upload error:",
-                    error
+}
+
+
+/* ============================================================
+   ENTER
+   ============================================================ */
+
+function handleChatKey(event) {
+
+    if (
+        event.key === "Enter" &&
+        !event.shiftKey
+    ) {
+
+        event.preventDefault();
+
+        sendMessage();
+
+    }
+
+}
+
+
+/* ============================================================
+   AUTO RESIZE
+   ============================================================ */
+
+function autoResizeInput(
+    element
+) {
+
+    element.style.height =
+        "auto";
+
+
+    element.style.height =
+        Math.min(
+            element.scrollHeight,
+            180
+        ) + "px";
+
+}
+
+
+/* ============================================================
+   QUICK ASK
+   ============================================================ */
+
+function quickAsk(
+    message
+) {
+
+    const input =
+        document.getElementById(
+            "chatInput"
+        );
+
+
+    input.value =
+        message;
+
+
+    input.focus();
+
+    autoResizeInput(
+        input
+    );
+
+}
+
+
+/* ============================================================
+   CHAT MESSAGES
+   ============================================================ */
+
+function addUserMessage(
+    message
+) {
+
+    const chatBox =
+        document.getElementById(
+            "chatBox"
+        );
+
+
+    const row =
+        document.createElement(
+            "div"
+        );
+
+
+    row.className =
+        "message-row user";
+
+
+    const avatar =
+        document.createElement(
+            "div"
+        );
+
+
+    avatar.className =
+        "message-avatar user-avatar";
+
+
+    avatar.textContent =
+        currentUser?.username
+            ?.charAt(0)
+            ?.toUpperCase() ||
+        "U";
+
+
+    const content =
+        document.createElement(
+            "div"
+        );
+
+
+    content.className =
+        "message-content";
+
+
+    content.textContent =
+        message;
+
+
+    row.appendChild(
+        content
+    );
+
+    row.appendChild(
+        avatar
+    );
+
+
+    chatBox.appendChild(
+        row
+    );
+
+
+    scrollChat();
+
+}
+
+
+function addAssistantMessage(
+    message
+) {
+
+    const chatBox =
+        document.getElementById(
+            "chatBox"
+        );
+
+
+    const row =
+        document.createElement(
+            "div"
+        );
+
+
+    row.className =
+        "message-row";
+
+
+    const avatar =
+        document.createElement(
+            "div"
+        );
+
+
+    avatar.className =
+        "message-avatar";
+
+
+    avatar.textContent =
+        "✦";
+
+
+    const content =
+        document.createElement(
+            "div"
+        );
+
+
+    content.className =
+        "message-content assistant-message-content";
+
+
+    content.textContent =
+        message;
+
+
+    row.appendChild(
+        avatar
+    );
+
+    row.appendChild(
+        content
+    );
+
+
+    chatBox.appendChild(
+        row
+    );
+
+
+    scrollChat();
+
+
+    return content;
+
+}
+
+
+/* ============================================================
+   SCROLL
+   ============================================================ */
+
+function scrollChat() {
+
+    const chatArea =
+        document.getElementById(
+            "chatArea"
+        );
+
+
+    if (chatArea) {
+
+        setTimeout(
+            function() {
+
+                chatArea.scrollTop =
+                    chatArea.scrollHeight;
+
+            },
+            20
+        );
+
+    }
+
+}
+
+
+/* ============================================================
+   LOAD CONVERSATION
+   ============================================================ */
+
+async function loadConversation() {
+
+    if (!currentUser) {
+
+        return;
+
+    }
+
+
+    try {
+
+        const response =
+            await fetch(
+
+                API_URL +
+                "/conversation/" +
+                encodeURIComponent(
+                    currentUser.user_id
+                )
+
+            );
+
+
+        if (!response.ok) {
+
+            return;
+
+        }
+
+
+        const data =
+            await response.json();
+
+
+        const chatBox =
+            document.getElementById(
+                "chatBox"
+            );
+
+
+        chatBox.innerHTML =
+            "";
+
+
+        const history =
+            data.conversation ||
+            [];
+
+
+        if (
+            history.length > 0
+        ) {
+
+            const welcome =
+                document.getElementById(
+                    "welcome"
                 );
 
-                status.textContent =
-                    "Could not connect to The Fix.";
+
+            if (welcome) {
+
+                welcome.classList.add(
+                    "hidden"
+                );
 
             }
 
         }
 
 
-        /*
-        ==========================================================
-        LOAD DOCUMENTS
-        ==========================================================
-        */
+        for (
+            const item of history
+        ) {
 
-        async function loadDocuments() {
+            if (
+                item.role ===
+                "user"
+            ) {
 
-            if (!currentUser) {
-
-                return;
-
-            }
-
-
-            const documentList =
-                document.getElementById(
-                    "documentList"
+                addUserMessage(
+                    item.content ||
+                    item.message ||
+                    ""
                 );
 
+            } else {
 
-            if (!documentList) {
-
-                return;
+                addAssistantMessage(
+                    item.content ||
+                    item.message ||
+                    ""
+                );
 
             }
 
+        }
 
-            try {
 
-                const response =
-                    await fetch(
-                        API_URL +
-                        "/documents"
+    } catch (error) {
+
+        console.log(
+            "Conversation load:",
+            error
+        );
+
+    }
+
+}
+
+
+/* ============================================================
+   MEMORY
+   ============================================================ */
+
+async function loadMemory() {
+
+    if (!currentUser) {
+
+        return;
+
+    }
+
+
+    try {
+
+        const response =
+            await fetch(
+
+                API_URL +
+                "/memory/" +
+                encodeURIComponent(
+                    currentUser.user_id
+                )
+
+            );
+
+
+        if (!response.ok) {
+
+            return;
+
+        }
+
+
+        const data =
+            await response.json();
+
+
+        const display =
+            document.getElementById(
+                "memoryDisplay"
+            );
+
+
+        if (!display) {
+
+            return;
+
+        }
+
+
+        display.innerHTML =
+            "";
+
+
+        const memories =
+            data.memories || [];
+
+
+        if (
+            memories.length === 0
+        ) {
+
+            display.textContent =
+                "No saved memories yet.";
+
+            return;
+
+        }
+
+
+        if (
+            Array.isArray(memories)
+        ) {
+
+            memories.forEach(
+                memory => {
+
+                    const div =
+                        document.createElement(
+                            "div"
+                        );
+
+
+                    div.className =
+                        "document-item";
+
+
+                    if (
+                        typeof memory ===
+                        "object"
+                    ) {
+
+                        div.textContent =
+                            `${
+                                memory.key ||
+                                ""
+                            }: ${
+                                memory.value ||
+                                ""
+                            }`;
+
+                    } else {
+
+                        div.textContent =
+                            String(
+                                memory
+                            );
+
+                    }
+
+
+                    display.appendChild(
+                        div
+                    );
+
+                }
+            );
+
+        } else {
+
+            Object.entries(
+                memories
+            ).forEach(
+                ([key, value]) => {
+
+                    const div =
+                        document.createElement(
+                            "div"
+                        );
+
+
+                    div.className =
+                        "document-item";
+
+
+                    div.textContent =
+                        `${key}: ${value}`;
+
+
+                    display.appendChild(
+                        div
+                    );
+
+                }
+            );
+
+        }
+
+
+    } catch (error) {
+
+        console.log(
+            "Memory:",
+            error
+        );
+
+    }
+
+}
+
+
+/* ============================================================
+   DOCUMENT UPLOAD
+   ============================================================ */
+
+async function uploadDocument() {
+
+    const input =
+        document.getElementById(
+            "documentInput"
+        );
+
+
+    const file =
+        input.files[0];
+
+
+    if (!file) {
+
+        document
+            .getElementById(
+                "documentStatus"
+            )
+            .textContent =
+                "Please select a document.";
+
+        return;
+
+    }
+
+
+    const formData =
+        new FormData();
+
+
+    formData.append(
+        "file",
+        file
+    );
+
+
+    document
+        .getElementById(
+            "documentStatus"
+        )
+        .textContent =
+            "Uploading document...";
+
+
+    try {
+
+        const response =
+            await fetch(
+
+                API_URL +
+                "/upload-document",
+
+                {
+                    method: "POST",
+                    body: formData
+                }
+
+            );
+
+
+        const data =
+            await response.json();
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                data.detail ||
+                "Document upload failed."
+            );
+
+        }
+
+
+        document
+            .getElementById(
+                "documentStatus"
+            )
+            .textContent =
+                data.message ||
+                "Document uploaded successfully.";
+
+
+        input.value = "";
+
+
+        loadDocuments();
+
+
+    } catch (error) {
+
+        document
+            .getElementById(
+                "documentStatus"
+            )
+            .textContent =
+                "Error: " +
+                error.message;
+
+    }
+
+}
+
+
+/* ============================================================
+   LOAD DOCUMENTS
+   ============================================================ */
+
+async function loadDocuments() {
+
+    try {
+
+        const response =
+            await fetch(
+                API_URL +
+                "/documents"
+            );
+
+
+        if (!response.ok) {
+
+            return;
+
+        }
+
+
+        const data =
+            await response.json();
+
+
+        const list =
+            document.getElementById(
+                "documentList"
+            );
+
+
+        if (!list) {
+
+            return;
+
+        }
+
+
+        list.innerHTML =
+            "";
+
+
+        const documents =
+            data.documents || [];
+
+
+        if (
+            documents.length === 0
+        ) {
+
+            list.textContent =
+                "No documents uploaded.";
+
+            return;
+
+        }
+
+
+        documents.forEach(
+            documentItem => {
+
+                const div =
+                    document.createElement(
+                        "div"
                     );
 
 
-                const data =
-                    await response.json();
+                div.className =
+                    "document-item";
 
 
-                if (
-                    !response.ok ||
-                    data.success !== true
-                ) {
-
-                    return;
-
-                }
+                div.textContent =
+                    `${
+                        documentItem.filename
+                    } (${
+                        documentItem.type
+                    })`;
 
 
-                documentList.innerHTML =
-                    "";
+                list.appendChild(
+                    div
+                );
+
+            }
+        );
 
 
-                if (
-                    !data.documents ||
-                    data.documents.length === 0
-                ) {
+    } catch (error) {
 
-                    documentList.innerHTML =
-                        "<p>No documents uploaded yet.</p>";
+        console.log(
+            "Documents:",
+            error
+        );
 
-                    return;
+    }
 
-                }
-
-
-                data.documents.forEach(
-                    documentData => {
-
-                        const item =
-                            document.createElement(
-                                "div"
-                            );
+}
 
 
-                        item.className =
-                            "document-item";
+/* ============================================================
+   IMAGE
+   ============================================================ */
+
+function chooseImage() {
+
+    document
+        .getElementById(
+            "imageInput"
+        )
+        .click();
+
+}
 
 
-                        if (
-                            selectedDocument ===
-                            documentData.filename
-                        ) {
+function handleImageSelection(
+    event
+) {
 
-                            item.classList.add(
-                                "selected"
-                            );
+    const file =
+        event.target.files[0];
 
+
+    if (!file) {
+
+        return;
+
+    }
+
+
+    selectedImageFile =
+        file;
+
+
+    const preview =
+        document.getElementById(
+            "imagePreview"
+        );
+
+
+    preview.src =
+        URL.createObjectURL(
+            file
+        );
+
+
+    document
+        .getElementById(
+            "imagePreviewBox"
+        )
+        .classList.remove(
+            "hidden"
+        );
+
+
+    document
+        .getElementById(
+            "visionStatus"
+        )
+        .textContent =
+            "Image ready for analysis.";
+
+}
+
+
+function removeSelectedImage() {
+
+    selectedImageFile =
+        null;
+
+
+    document
+        .getElementById(
+            "imageInput"
+        )
+        .value =
+            "";
+
+
+    document
+        .getElementById(
+            "imagePreview"
+        )
+        .src =
+            "";
+
+
+    document
+        .getElementById(
+            "imagePreviewBox"
+        )
+        .classList.add(
+            "hidden"
+        );
+
+
+    document
+        .getElementById(
+            "visionStatus"
+        )
+        .textContent =
+            "";
+
+}
+
+
+/* ============================================================
+   CAMERA
+   ============================================================ */
+
+async function openCamera() {
+
+    try {
+
+        if (
+            !navigator.mediaDevices
+        ) {
+
+            throw new Error(
+                "Camera access is not available."
+            );
+
+        }
+
+
+        cameraStream =
+            await navigator.mediaDevices
+                .getUserMedia({
+
+                    video: {
+
+                        facingMode: {
+                            ideal:
+                                "environment"
+                        },
+
+                        width: {
+                            ideal: 1280
+                        },
+
+                        height: {
+                            ideal: 720
                         }
 
+                    },
 
-                        item.textContent =
-                            documentData.filename;
+                    audio: false
 
-
-                        item.onclick =
-                            function () {
-
-                                selectedDocument =
-                                    documentData.filename;
+                });
 
 
-                                documentList
-                                    .querySelectorAll(
-                                        ".document-item"
-                                    )
-                                    .forEach(
-                                        element => {
-
-                                            element.classList.remove(
-                                                "selected"
-                                            );
-
-                                        }
-                                    );
+        document
+            .getElementById(
+                "cameraVideo"
+            )
+            .srcObject =
+                cameraStream;
 
 
-                                item.classList.add(
-                                    "selected"
-                                );
+        document
+            .getElementById(
+                "cameraBox"
+            )
+            .classList.remove(
+                "hidden"
+            );
 
 
-                                updateSelectedDocument();
+        document
+            .getElementById(
+                "visionStatus"
+            )
+            .textContent =
+                "Camera is ready.";
 
-                            };
+    } catch (error) {
+
+        document
+            .getElementById(
+                "visionStatus"
+            )
+            .textContent =
+                "Camera error: " +
+                error.message;
+
+    }
+
+}
 
 
-                        documentList.appendChild(
-                            item
-                        );
+function closeCamera() {
 
+    if (cameraStream) {
+
+        cameraStream
+            .getTracks()
+            .forEach(
+                track =>
+                    track.stop()
+            );
+
+
+        cameraStream =
+            null;
+
+    }
+
+
+    const video =
+        document.getElementById(
+            "cameraVideo"
+        );
+
+
+    if (video) {
+
+        video.srcObject =
+            null;
+
+    }
+
+
+    const box =
+        document.getElementById(
+            "cameraBox"
+        );
+
+
+    if (box) {
+
+        box.classList.add(
+            "hidden"
+        );
+
+    }
+
+}
+
+
+/* ============================================================
+   TAKE PICTURE
+   ============================================================ */
+
+function takePicture() {
+
+    const video =
+        document.getElementById(
+            "cameraVideo"
+        );
+
+
+    const canvas =
+        document.getElementById(
+            "cameraCanvas"
+        );
+
+
+    if (
+        !video.videoWidth ||
+        !video.videoHeight
+    ) {
+
+        document
+            .getElementById(
+                "visionStatus"
+            )
+            .textContent =
+                "Camera is not ready yet.";
+
+        return;
+
+    }
+
+
+    canvas.width =
+        video.videoWidth;
+
+
+    canvas.height =
+        video.videoHeight;
+
+
+    const context =
+        canvas.getContext(
+            "2d"
+        );
+
+
+    context.drawImage(
+        video,
+        0,
+        0,
+        canvas.width,
+        canvas.height
+    );
+
+
+    canvas.toBlob(
+        function(blob) {
+
+            selectedImageFile =
+                new File(
+                    [blob],
+                    "camera-picture.jpg",
+                    {
+                        type:
+                            "image/jpeg"
                     }
                 );
 
 
-                updateSelectedDocument();
-
-            }
-
-
-            catch (error) {
-
-                console.error(
-                    "Document list error:",
-                    error
-                );
-
-            }
-
-        }
-
-
-        /*
-        ==========================================================
-        SHOW SELECTED DOCUMENT
-        ==========================================================
-        */
-
-        function updateSelectedDocument() {
-
-            const element =
+            const preview =
                 document.getElementById(
-                    "selectedDocument"
+                    "imagePreview"
                 );
 
 
-            if (!element) {
+            preview.src =
+                URL.createObjectURL(
+                    blob
+                );
 
-                return;
 
-            }
-
-
-            if (selectedDocument) {
-
-                element.textContent =
-                    "📄 Selected document: " +
-                    selectedDocument +
-                    " — your questions will be answered from this document.";
-
-                element.classList.remove(
+            document
+                .getElementById(
+                    "imagePreviewBox"
+                )
+                .classList.remove(
                     "hidden"
                 );
 
-            }
+
+            document
+                .getElementById(
+                    "visionStatus"
+                )
+                .textContent =
+                    "Picture captured. Ask The Fix to analyze it.";
+
+        },
+
+        "image/jpeg",
+
+        0.92
+
+    );
+
+}
 
 
-            else {
+/* ============================================================
+   IMAGE ANALYSIS
+   ============================================================ */
 
-                element.textContent =
-                    "";
+async function analyzeSelectedImage() {
 
-                element.classList.add(
-                    "hidden"
-                );
+    if (!selectedImageFile) {
 
-            }
+        document
+            .getElementById(
+                "visionStatus"
+            )
+            .textContent =
+                "Please select or capture an image first.";
 
-        }
+        return;
+
+    }
 
 
-        /*
-        ==========================================================
-        PAGE LOAD
-        ==========================================================
-        */
+    const question =
+        prompt(
+            "What would you like The Fix to analyze?",
+            "Describe and analyze this image in detail."
+        );
 
-        window.onload =
-            function () {
 
-                if (currentUser) {
+    if (!question) {
 
-                    showChat();
+        return;
 
+    }
+
+
+    const formData =
+        new FormData();
+
+
+    formData.append(
+        "image",
+        selectedImageFile
+    );
+
+
+    formData.append(
+        "question",
+
+        question +
+        "\n\nRespond in " +
+        LANGUAGE_NAMES[
+            selectedLanguage
+        ] +
+        "."
+    );
+
+
+    document
+        .getElementById(
+            "visionStatus"
+        )
+        .textContent =
+            "The Fix is analyzing the image...";
+
+
+    try {
+
+        const response =
+            await fetch(
+
+                API_URL +
+                "/analyze-image",
+
+                {
+                    method: "POST",
+                    body: formData
                 }
 
-            };
+            );
 
 
-    </script>
+        const data =
+            await response.json();
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                data.detail ||
+                "Image analysis failed."
+            );
+
+        }
+
+
+        addUserMessage(
+            "🖼️ " +
+            question
+        );
+
+
+        const answer =
+            data.answer ||
+            "The Fix could not analyze the image.";
+
+
+        addAssistantMessage(
+            answer
+        );
+
+
+        document
+            .getElementById(
+                "visionStatus"
+            )
+            .textContent =
+                "Image analysis complete.";
+
+
+        speakText(
+            answer
+        );
+
+
+        scrollChat();
+
+
+    } catch (error) {
+
+        document
+            .getElementById(
+                "visionStatus"
+            )
+            .textContent =
+                "Vision error: " +
+                error.message;
+
+    }
+
+}
+
+
+/* ============================================================
+   SAVED USER
+   ============================================================ */
+
+function checkSavedUser() {
+
+    const saved =
+        localStorage.getItem(
+            "the_fix_user"
+        );
+
+
+    if (!saved) {
+
+        return;
+
+    }
+
+
+    try {
+
+        currentUser =
+            JSON.parse(
+                saved
+            );
+
+
+        showChat();
+
+
+    } catch (error) {
+
+        localStorage.removeItem(
+            "the_fix_user"
+        );
+
+    }
+
+}
+
+
+/* ============================================================
+   STARTUP
+   ============================================================ */
+
+document.addEventListener(
+    "DOMContentLoaded",
+    function() {
+
+        const languageSelect =
+            document.getElementById(
+                "languageSelect"
+            );
+
+
+        if (languageSelect) {
+
+            languageSelect.value =
+                selectedLanguage;
+
+        }
+
+
+        checkSavedUser();
+
+
+        const input =
+            document.getElementById(
+                "chatInput"
+            );
+
+
+        if (input) {
+
+            input.focus();
+
+        }
+
+    }
+);
+
+
+/* ============================================================
+   SPEECH VOICES
+   ============================================================ */
+
+if (
+    window.speechSynthesis
+) {
+
+    window.speechSynthesis
+        .onvoiceschanged =
+        function() {
+
+            window.speechSynthesis
+                .getVoices();
+
+        };
+
+}
+
+</script>
 
 </body>
-
 </html>

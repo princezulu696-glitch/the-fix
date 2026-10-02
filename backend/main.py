@@ -2,11 +2,16 @@ import os
 import time
 import re
 import requests
+from pathlib import Path
 
+from math_engine import solve_math
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
+
+from vision import router as vision_router
 
 from users import (
     create_user,
@@ -29,7 +34,7 @@ from web_search import web_search
 
 
 # ============================================================
-# OPTIONAL DOCUMENT MODULES
+# OPTIONAL DOCUMENT SYSTEM
 # ============================================================
 
 try:
@@ -41,19 +46,161 @@ try:
     from document_search import search_document
 except Exception:
     search_document = None
+
+
 # ============================================================
-# CONFIGURATION
+# ENVIRONMENT
 # ============================================================
 
 load_dotenv()
 
-APP_NAME = "The Fix"
 
-APP_VERSION = "8.0.0"
+# ============================================================
+# APPLICATION
+# ============================================================
+
+APP_NAME = "The Fix"
+APP_VERSION = "11.3.0"
 
 OLLAMA_URL = "http://127.0.0.1:11434/api/chat"
+OLLAMA_TAGS_URL = "http://127.0.0.1:11434/api/tags"
 
-OLLAMA_MODEL = "qwen3:1.7b"
+
+# ============================================================
+# MODELS
+# ============================================================
+
+FAST_MODEL = "qwen3:1.7b"
+POWERFUL_MODEL = "qwen3:4b"
+VISION_MODEL = "qwen3-vl:2b"
+MORENA_MODEL = "hf.co/vamboai/morena-1.5b-instruct-gguf:Q4_K_M"
+
+OLLAMA_MODEL = FAST_MODEL
+
+
+# ============================================================
+# PERFORMANCE SETTINGS
+# ============================================================
+
+FAST_KEEP_ALIVE = "2h"
+MORENA_KEEP_ALIVE = "2h"
+POWERFUL_KEEP_ALIVE = "30m"
+
+
+# ============================================================
+# MODEL CACHE
+# ============================================================
+
+_MODEL_CACHE = []
+_MODEL_CACHE_TIME = 0
+MODEL_CACHE_SECONDS = 60
+
+
+# ============================================================
+# FRONTEND
+# ============================================================
+
+FRONTEND_FOLDER = (
+    Path(__file__).resolve().parent.parent / "frontend"
+)
+
+FRONTEND_FILE = FRONTEND_FOLDER / "index.html"
+
+
+# ============================================================
+# LANGUAGES
+# ============================================================
+
+LANGUAGES = {
+    "en-ZA": "English (South Africa)",
+    "zu-ZA": "isiZulu",
+    "xh-ZA": "isiXhosa",
+    "st-ZA": "Sesotho",
+    "tn-ZA": "Setswana",
+    "nso-ZA": "Sepedi",
+    "af-ZA": "Afrikaans",
+    "ss-ZA": "siSwati",
+    "ts-ZA": "itsonga",
+    "ve-ZA": "Tshivenda",
+    "nr-ZA": "isiNdebele",
+
+    "en-US": "English",
+    "fr-FR": "French",
+    "es-ES": "Spanish",
+    "pt-PT": "Portuguese",
+    "de-DE": "German",
+    "it-IT": "Italian",
+    "nl-NL": "Dutch",
+    "ar-SA": "Arabic",
+    "zh-CN": "Chinese",
+    "ja-JP": "Japanese",
+    "ko-KR": "Korean",
+    "hi-IN": "Hindi",
+    "ru-RU": "Russian",
+}
+
+
+# ============================================================
+# NATIVE LANGUAGE NAMES
+# ============================================================
+
+LANGUAGE_NATIVE_NAMES = {
+    "en-ZA": "English",
+    "zu-ZA": "isiZulu",
+    "xh-ZA": "isiXhosa",
+    "st-ZA": "Sesotho",
+    "tn-ZA": "Setswana",
+    "nso-ZA": "Sepedi",
+    "af-ZA": "Afrikaans",
+    "ss-ZA": "siSwati",
+    "ts-ZA": "itsonga",
+    "ve-ZA": "Tshivenda",
+    "nr-ZA": "isiNdebele",
+
+    "en-US": "English",
+    "fr-FR": "Français",
+    "es-ES": "Español",
+    "pt-PT": "Português",
+    "de-DE": "Deutsch",
+    "it-IT": "Italiano",
+    "nl-NL": "Nederlands",
+    "ar-SA": "العربية",
+    "zh-CN": "中文",
+    "ja-JP": "日本語",
+    "ko-KR": "한국어",
+    "hi-IN": "हिन्दी",
+    "ru-RU": "Русский",
+}
+
+
+AFRICAN_LANGUAGES = {
+    "zu-ZA",
+    "xh-ZA",
+    "st-ZA",
+    "tn-ZA",
+    "nso-ZA",
+    "af-ZA",
+    "ss-ZA",
+    "ts-ZA",
+    "ve-ZA",
+    "nr-ZA",
+}
+
+
+MULTILINGUAL_LANGUAGES = AFRICAN_LANGUAGES | {
+    "fr-FR",
+    "es-ES",
+    "pt-PT",
+    "de-DE",
+    "it-IT",
+    "nl-NL",
+    "ar-SA",
+    "zh-CN",
+    "ja-JP",
+    "ko-KR",
+    "hi-IN",
+    "ru-RU",
+}
 
 
 # ============================================================
@@ -61,8 +208,9 @@ OLLAMA_MODEL = "qwen3:1.7b"
 # ============================================================
 
 app = FastAPI(
-    title="The Fix API",
-    version=APP_VERSION
+    title=APP_NAME,
+    version=APP_VERSION,
+    description="The Fix - multilingual personal AI",
 )
 
 
@@ -75,18 +223,15 @@ app.add_middleware(
 )
 
 
+app.include_router(vision_router)
+
+
 # ============================================================
 # REQUEST MODELS
 # ============================================================
 
-class ChatRequest(BaseModel):
-    user_id: str
-    message: str
-
-
 class RegisterRequest(BaseModel):
     username: str
-    email: str
     password: str
 
 
@@ -99,7 +244,6 @@ class MemoryRequest(BaseModel):
     user_id: str
     key: str
     value: str
-    category: str = "general"
 
 
 class ForgetRequest(BaseModel):
@@ -107,20 +251,27 @@ class ForgetRequest(BaseModel):
     key: str
 
 
-class ClearConversationRequest(BaseModel):
+class ChatRequest(BaseModel):
+    user_id: str
+    message: str
+    language: str = "en-ZA"
+
+
+class ConversationClearRequest(BaseModel):
     user_id: str
 
 
-class PDFQuestionRequest(BaseModel):
+class DocumentQuestionRequest(BaseModel):
     user_id: str
+    filename: str
     question: str
+    language: str = "en-ZA"
+
+
+class DocumentSearchRequest(BaseModel):
     filename: str
-
-
-class PDFSearchRequest(BaseModel):
-    user_id: str
     query: str
-    filename: str
+    top_k: int = 5
 
 
 # ============================================================
@@ -128,61 +279,462 @@ class PDFSearchRequest(BaseModel):
 # ============================================================
 
 def safe_string(value):
-
     if value is None:
         return ""
 
     return str(value).strip()
 
 
-def clean_answer(text):
+def get_language_code(language):
+    language = safe_string(language)
+
+    if language in LANGUAGES:
+        return language
+
+    return "en-ZA"
+
+
+def get_language_name(language):
+    code = get_language_code(language)
+
+    return LANGUAGES.get(
+        code,
+        "English (South Africa)"
+    )
+
+
+def get_language_native_name(language):
+    code = get_language_code(language)
+
+    return LANGUAGE_NATIVE_NAMES.get(
+        code,
+        "English"
+    )
+
+
+def is_multilingual_language(language):
+    return get_language_code(language) in MULTILINGUAL_LANGUAGES
+
+
+def is_african_language(language):
+    return get_language_code(language) in AFRICAN_LANGUAGES
+
+
+# ============================================================
+# LIGHTWEIGHT LANGUAGE DETECTION
+# ============================================================
+
+ENGLISH_GREETINGS = {
+    "hi",
+    "hello",
+    "hey",
+    "hiya",
+    "good morning",
+    "good afternoon",
+    "good evening",
+    "morning",
+    "afternoon",
+    "evening",
+}
+
+
+ZULU_GREETINGS = {
+    "sawubona",
+    "sanibonani",
+    "yebo",
+    "unjani",
+    "ninjani",
+    "ngiyabingelela",
+}
+
+
+ENGLISH_MARKERS = {
+    "the",
+    "is",
+    "are",
+    "am",
+    "what",
+    "why",
+    "how",
+    "when",
+    "where",
+    "who",
+    "which",
+    "can",
+    "could",
+    "would",
+    "should",
+    "please",
+    "explain",
+    "tell",
+    "give",
+    "help",
+    "calculate",
+    "solve",
+    "show",
+    "make",
+    "create",
+    "want",
+    "need",
+    "this",
+    "that",
+    "with",
+    "from",
+    "for",
+    "and",
+    "or",
+    "about",
+    "hello",
+    "hi",
+    "hey",
+    "electricity",
+    "computer",
+    "python",
+    "code",
+}
+
+
+ZULU_MARKERS = {
+    "ngicela",
+    "ngiyacela",
+    "ukuthi",
+    "uyini",
+    "yini",
+    "kanjani",
+    "kungani",
+    "kuphi",
+    "nini",
+    "ngubani",
+    "ngiyabonga",
+    "sawubona",
+    "sanibonani",
+    "unjani",
+    "ninjani",
+    "mina",
+    "wena",
+    "thina",
+    "lokhu",
+    "leyo",
+    "lena",
+    "lapha",
+    "khona",
+    "kakhulu",
+    "ngifuna",
+    "ngidinga",
+    "ngisize",
+    "ngichazele",
+    "ngitshele",
+    "futhi",
+    "kodwa",
+    "ngoba",
+    "uma",
+    "yebo",
+    "cha",
+    "ugesi",
+    "amanzi",
+    "isikole",
+    "umsebenzi",
+    "umbuzo",
+    "impendulo",
+}
+
+
+def normalize_for_language_detection(text):
+    text = safe_string(text).lower()
+
+    text = re.sub(
+        r"[^\w\s?'!-]",
+        " ",
+        text,
+        flags=re.UNICODE
+    )
+
+    text = re.sub(
+        r"\s+",
+        " ",
+        text
+    ).strip()
+
+    return text
+
+
+def detect_input_language(message, requested_language):
+
+    requested = get_language_code(
+        requested_language
+    )
+
+    text = normalize_for_language_detection(
+        message
+    )
 
     if not text:
-        return ""
+        return requested
 
-    text = str(text).strip()
+    if text in ENGLISH_GREETINGS:
 
-    # Remove hidden thinking blocks.
-    text = re.sub(
-        r"<think>.*?</think>",
-        "",
-        text,
-        flags=re.DOTALL | re.IGNORECASE
+        if requested == "en-US":
+            return "en-US"
+
+        return "en-ZA"
+
+    if text in ZULU_GREETINGS:
+        return "zu-ZA"
+
+    words = set(
+        text.split()
     )
 
-    text = text.replace(
-        "<|im_end|>",
-        ""
-    )
+    english_score = 0
+    zulu_score = 0
 
-    return text.strip()
+    for word in words:
+
+        if word in ENGLISH_MARKERS:
+            english_score += 1
+
+        if word in ZULU_MARKERS:
+            zulu_score += 1
+
+    if zulu_score >= 2 and zulu_score > english_score:
+        return "zu-ZA"
+
+    if english_score >= 2 and english_score > zulu_score:
+
+        if requested == "en-US":
+            return "en-US"
+
+        return "en-ZA"
+
+    distinctive_zulu = {
+        "ngicela",
+        "ngiyacela",
+        "sawubona",
+        "sanibonani",
+        "ngiyabonga",
+        "uyini",
+        "kungani",
+        "kanjani",
+        "ngisize",
+        "ngichazele",
+        "ngitshele",
+        "ugesi",
+    }
+
+    if any(
+        word in words
+        for word in distinctive_zulu
+    ):
+        return "zu-ZA"
+
+    return requested
 
 
 # ============================================================
-# OLLAMA STATUS
+# SIMPLE GREETING DETECTION
 # ============================================================
 
-def ollama_available():
+def detect_greeting(message):
+
+    text = normalize_for_language_detection(
+        message
+    )
+
+    if text in ENGLISH_GREETINGS:
+        return "en"
+
+    if text in ZULU_GREETINGS:
+        return "zu"
+
+    return None
+
+
+def greeting_response(language):
+
+    language = get_language_code(
+        language
+    )
+
+    if language == "zu-ZA":
+        return "Sawubona! Ngingakusiza ngani?"
+
+    return "Hello! How can I assist you today?"
+
+
+# ============================================================
+# OLLAMA MODEL LIST
+# ============================================================
+
+def get_available_models(force=False):
+
+    global _MODEL_CACHE
+    global _MODEL_CACHE_TIME
+
+    now = time.time()
+
+    if (
+        not force
+        and _MODEL_CACHE
+        and now - _MODEL_CACHE_TIME < MODEL_CACHE_SECONDS
+    ):
+        return _MODEL_CACHE
 
     try:
 
         response = requests.get(
-            "http://127.0.0.1:11434/api/tags",
-            timeout=5
+            OLLAMA_TAGS_URL,
+            timeout=3
         )
 
-        return response.status_code == 200
+        if response.status_code != 200:
+            return _MODEL_CACHE
+
+        data = response.json()
+
+        models = [
+            item.get("name")
+            for item in data.get("models", [])
+            if item.get("name")
+        ]
+
+        _MODEL_CACHE = models
+        _MODEL_CACHE_TIME = now
+
+        return models
 
     except Exception:
 
-        return False
+        return _MODEL_CACHE
+
+
+def model_available(model_name):
+    return model_name in get_available_models()
 
 
 # ============================================================
-# MEMORY FORMATTER
+# REQUEST COMPLEXITY
 # ============================================================
 
-def build_memory_text(user_id):
+def is_complex_request(message):
+
+    text = safe_string(message).lower()
+
+    complex_phrases = [
+        "explain in detail",
+        "detailed explanation",
+        "step by step",
+        "analyse",
+        "analyze",
+        "summarize",
+        "summary",
+        "compare",
+        "calculate",
+        "solve",
+        "derive",
+        "prove",
+        "equation",
+        "mathematics",
+        "math",
+        "engineering",
+        "physics",
+        "thermodynamics",
+        "laplace",
+        "differential equation",
+        "program",
+        "programming",
+        "code",
+        "debug",
+        "python",
+        "javascript",
+        "matlab",
+        "algorithm",
+        "report",
+        "essay",
+        "design",
+        "everything about",
+        "why does",
+        "how does",
+        "explain how",
+        "explain why",
+    ]
+
+    for phrase in complex_phrases:
+
+        if phrase in text:
+            return True
+
+    if len(text) > 280:
+        return True
+
+    return False
+
+
+# ============================================================
+# MODEL ROUTER
+# ============================================================
+
+def choose_model(
+    user_message,
+    language="en-ZA",
+    has_web=False,
+    has_document=False
+):
+
+    language_code = get_language_code(
+        language
+    )
+
+    if language_code == "zu-ZA":
+
+        if model_available(MORENA_MODEL):
+            return MORENA_MODEL, "morena-isizulu"
+
+        if model_available(FAST_MODEL):
+            return FAST_MODEL, "isizulu-fallback"
+
+        return POWERFUL_MODEL, "isizulu-fallback"
+
+    if has_document or has_web:
+
+        if model_available(POWERFUL_MODEL):
+
+            if is_multilingual_language(
+                language_code
+            ):
+                return POWERFUL_MODEL, "multilingual-powerful"
+
+            return POWERFUL_MODEL, "powerful"
+
+        return FAST_MODEL, "fast"
+
+    if is_complex_request(
+        user_message
+    ):
+
+        if model_available(POWERFUL_MODEL):
+
+            if is_multilingual_language(
+                language_code
+            ):
+                return POWERFUL_MODEL, "multilingual-powerful"
+
+            return POWERFUL_MODEL, "powerful"
+
+        return FAST_MODEL, "fast"
+
+    if is_multilingual_language(
+        language_code
+    ):
+        return FAST_MODEL, "multilingual-fast"
+
+    return FAST_MODEL, "fast"
+
+
+# ============================================================
+# MEMORY
+# ============================================================
+
+def get_memory_context(user_id):
 
     try:
 
@@ -190,94 +742,19 @@ def build_memory_text(user_id):
             user_id
         )
 
+        if not memories:
+            return ""
+
+        return str(
+            memories
+        )
+
     except Exception:
 
         return ""
 
 
-    if not memories:
-
-        return ""
-
-
-    lines = []
-
-
-    if isinstance(
-        memories,
-        dict
-    ):
-
-        for key, value in memories.items():
-
-            if value is None:
-                continue
-
-            key = safe_string(key)
-            value = safe_string(value)
-
-            if key and value:
-
-                lines.append(
-                    f"- {key}: {value}"
-                )
-
-
-    elif isinstance(
-        memories,
-        list
-    ):
-
-        for item in memories:
-
-            if isinstance(
-                item,
-                dict
-            ):
-
-                key = safe_string(
-                    item.get(
-                        "key",
-                        ""
-                    )
-                )
-
-                value = safe_string(
-                    item.get(
-                        "value",
-                        ""
-                    )
-                )
-
-                category = safe_string(
-                    item.get(
-                        "category",
-                        "general"
-                    )
-                )
-
-
-                if key and value:
-
-                    lines.append(
-                        f"- [{category}] {key}: {value}"
-                    )
-
-            else:
-
-                lines.append(
-                    f"- {safe_string(item)}"
-                )
-
-
-    return "\n".join(lines)
-
-
-# ============================================================
-# CONVERSATION FORMATTER
-# ============================================================
-
-def build_conversation_text(user_id):
+def get_conversation_context(user_id):
 
     try:
 
@@ -285,108 +762,140 @@ def build_conversation_text(user_id):
             user_id
         )
 
+        if not history:
+            return ""
+
+        if isinstance(
+            history,
+            list
+        ):
+
+            recent = history[-4:]
+
+            lines = []
+
+            for item in recent:
+
+                if isinstance(
+                    item,
+                    dict
+                ):
+
+                    role = item.get(
+                        "role",
+                        ""
+                    )
+
+                    content = item.get(
+                        "content",
+                        item.get(
+                            "message",
+                            ""
+                        )
+                    )
+
+                    if content:
+
+                        content = str(
+                            content
+                        )[:1000]
+
+                        lines.append(
+                            f"{role}: {content}"
+                        )
+
+            return "\n".join(
+                lines
+            )
+
+        return str(
+            history
+        )[-4000:]
+
     except Exception:
 
         return ""
 
 
-    if not history:
-
-        return ""
-
-
-    lines = []
-
-
-    for item in history[-10:]:
-
-        if not isinstance(
-            item,
-            dict
-        ):
-
-            continue
-
-
-        role = safe_string(
-            item.get(
-                "role",
-                ""
-            )
-        )
-
-
-        content = safe_string(
-            item.get(
-                "content",
-                item.get(
-                    "message",
-                    ""
-                )
-            )
-        )
-
-
-        if role and content:
-
-            lines.append(
-                f"{role}: {content}"
-            )
-
-
-    return "\n".join(lines)
-
-
 # ============================================================
-# AUTOMATIC MEMORY DETECTION
+# AUTOMATIC MEMORY
 # ============================================================
 
-def detect_automatic_memory(message):
+def detect_and_save_memory(
+    user_id,
+    message
+):
 
     text = safe_string(
         message
     )
 
-    lower = text.lower().strip()
-
-
-    if not lower:
-
-        return None
-
-
-    # --------------------------------------------------------
-    # NAME
-    # --------------------------------------------------------
-
     patterns = [
 
-        r"^remember that my name is\s+(.+)$",
+        (
+            r"\bmy name is\s+(.+)",
+            "name"
+        ),
 
-        r"^my name is\s+(.+)$",
+        (
+            r"\bcall me\s+(.+)",
+            "name"
+        ),
 
-        r"^remember my name is\s+(.+)$",
+        (
+            r"\bremember that my name is\s+(.+)",
+            "name"
+        ),
 
-        r"^call me\s+(.+)$",
+        (
+            r"\bmy favorite color is\s+(.+)",
+            "favorite_color"
+        ),
 
-        r"^from now on, call me\s+(.+)$",
+        (
+            r"\bmy favourite color is\s+(.+)",
+            "favorite_color"
+        ),
 
-        r"^remember to call me\s+(.+)$",
+        (
+            r"\bmy favorite subject is\s+(.+)",
+            "favorite_subject"
+        ),
 
+        (
+            r"\bmy favourite subject is\s+(.+)",
+            "favorite_subject"
+        ),
+
+        (
+            r"\bmy programming language is\s+(.+)",
+            "programming_language"
+        ),
+
+        (
+            r"\bi prefer\s+(.+)",
+            "preference"
+        ),
+
+        (
+            r"\bi am building\s+(.+)",
+            "current_project"
+        ),
     ]
 
+    for pattern, key in patterns:
 
-    for pattern in patterns:
-
-        match = re.match(
+        match = re.search(
             pattern,
             text,
-            flags=re.IGNORECASE
+            re.IGNORECASE
         )
 
         if match:
 
-            value = match.group(1).strip()
+            value = match.group(
+                1
+            ).strip()
 
             value = re.sub(
                 r"[.!?]+$",
@@ -396,355 +905,26 @@ def detect_automatic_memory(message):
 
             if value:
 
-                return {
-                    "key": "name",
-                    "value": value,
-                    "category": "profile"
-                }
+                try:
 
+                    remember(
+                        user_id,
+                        key,
+                        value
+                    )
 
-    # --------------------------------------------------------
-    # FAVORITE COLOR
-    # --------------------------------------------------------
+                    return True
 
-    patterns = [
+                except Exception:
 
-        r"^remember that my favorite color is\s+(.+)$",
+                    return False
 
-        r"^my favorite color is\s+(.+)$",
-
-        r"^my favourite color is\s+(.+)$",
-
-        r"^remember my favorite color is\s+(.+)$",
-
-        r"^remember my favourite colour is\s+(.+)$",
-
-    ]
-
-
-    for pattern in patterns:
-
-        match = re.match(
-            pattern,
-            text,
-            flags=re.IGNORECASE
-        )
-
-        if match:
-
-            value = match.group(1).strip()
-
-            value = re.sub(
-                r"[.!?]+$",
-                "",
-                value
-            ).strip()
-
-            if value:
-
-                return {
-                    "key": "favorite color",
-                    "value": value,
-                    "category": "preference"
-                }
-
-
-    # --------------------------------------------------------
-    # FAVORITE SUBJECT
-    # --------------------------------------------------------
-
-    patterns = [
-
-        r"^remember that my favorite subject is\s+(.+)$",
-
-        r"^my favorite subject is\s+(.+)$",
-
-        r"^my favourite subject is\s+(.+)$",
-
-        r"^remember my favorite subject is\s+(.+)$",
-
-        r"^remember my favourite subject is\s+(.+)$",
-
-    ]
-
-
-    for pattern in patterns:
-
-        match = re.match(
-            pattern,
-            text,
-            flags=re.IGNORECASE
-        )
-
-        if match:
-
-            value = match.group(1).strip()
-
-            value = re.sub(
-                r"[.!?]+$",
-                "",
-                value
-            ).strip()
-
-            if value:
-
-                return {
-                    "key": "favorite subject",
-                    "value": value,
-                    "category": "preference"
-                }
-
-
-    # --------------------------------------------------------
-    # PREFERENCE
-    # --------------------------------------------------------
-
-    patterns = [
-
-        r"^remember that i prefer\s+(.+)$",
-
-        r"^i prefer\s+(.+)$",
-
-        r"^remember that i like\s+(.+)$",
-
-        r"^i like\s+(.+)$",
-
-    ]
-
-
-    for pattern in patterns:
-
-        match = re.match(
-            pattern,
-            text,
-            flags=re.IGNORECASE
-        )
-
-        if match:
-
-            value = match.group(1).strip()
-
-            value = re.sub(
-                r"[.!?]+$",
-                "",
-                value
-            ).strip()
-
-            if value:
-
-                return {
-                    "key": "preference",
-                    "value": value,
-                    "category": "preference"
-                }
-
-
-    # --------------------------------------------------------
-    # CURRENT PROJECT
-    # --------------------------------------------------------
-
-    patterns = [
-
-        r"^remember that i am working on\s+(.+)$",
-
-        r"^i am working on\s+(.+)$",
-
-        r"^i'm working on\s+(.+)$",
-
-        r"^remember that i'm working on\s+(.+)$",
-
-        r"^my current project is\s+(.+)$",
-
-        r"^remember that my current project is\s+(.+)$",
-
-        r"^i am building\s+(.+)$",
-
-        r"^i'm building\s+(.+)$",
-
-        r"^remember that i am building\s+(.+)$",
-
-    ]
-
-
-    for pattern in patterns:
-
-        match = re.match(
-            pattern,
-            text,
-            flags=re.IGNORECASE
-        )
-
-        if match:
-
-            value = match.group(1).strip()
-
-            value = re.sub(
-                r"[.!?]+$",
-                "",
-                value
-            ).strip()
-
-            # Remove temporary time words.
-            value = re.sub(
-                r"\s+(today|tonight|this week|this month)$",
-                "",
-                value,
-                flags=re.IGNORECASE
-            ).strip()
-
-            if value:
-
-                return {
-                    "key": "current project",
-                    "value": value,
-                    "category": "project"
-                }
-
-
-    # --------------------------------------------------------
-    # FAVORITE PROGRAMMING LANGUAGE
-    # --------------------------------------------------------
-
-    patterns = [
-
-        r"^my favorite programming language is\s+(.+)$",
-
-        r"^my favourite programming language is\s+(.+)$",
-
-        r"^remember that my favorite programming language is\s+(.+)$",
-
-        r"^remember that my favourite programming language is\s+(.+)$",
-
-    ]
-
-
-    for pattern in patterns:
-
-        match = re.match(
-            pattern,
-            text,
-            flags=re.IGNORECASE
-        )
-
-        if match:
-
-            value = match.group(1).strip()
-
-            value = re.sub(
-                r"[.!?]+$",
-                "",
-                value
-            ).strip()
-
-            if value:
-
-                return {
-                    "key": "favorite programming language",
-                    "value": value,
-                    "category": "preference"
-                }
-
-
-    return None
+    return False
 
 
 # ============================================================
-# AUTOMATIC MEMORY SAVER
+# WEB SEARCH
 # ============================================================
-
-def save_automatic_memory(
-    user_id,
-    message
-):
-
-    memory = detect_automatic_memory(
-        message
-    )
-
-
-    if not memory:
-
-        return None
-
-
-    try:
-
-        remember(
-
-            user_id,
-
-            memory["key"],
-
-            memory["value"]
-
-        )
-
-        return memory
-
-
-    except Exception:
-
-        return None
-
-
-# ============================================================
-# SMART WEB SEARCH DETECTION
-# ============================================================
-
-CURRENT_QUESTION_PATTERNS = [
-
-    r"\bwhat is the latest\b",
-
-    r"\bwhat's the latest\b",
-
-    r"\blatest news\b",
-
-    r"\brecent news\b",
-
-    r"\bwhat happened today\b",
-
-    r"\bwhat happened yesterday\b",
-
-    r"\bwhat is happening now\b",
-
-    r"\bwhat's happening now\b",
-
-    r"\bwhat is happening currently\b",
-
-    r"\bwhat's happening currently\b",
-
-    r"\bcurrent price\b",
-
-    r"\bcurrent weather\b",
-
-    r"\bcurrent president\b",
-
-    r"\bcurrent news\b",
-
-    r"\bcurrent events\b",
-
-    r"\bwho is currently\b",
-
-    r"\bwhat is currently\b",
-
-    r"\bwhat's currently\b",
-
-    r"\bsearch the web\b",
-
-    r"\bsearch online\b",
-
-    r"\blook it up\b",
-
-    r"\bfind online\b",
-
-    r"\baccording to recent\b",
-
-    r"\bthis week's news\b",
-
-    r"\bthis month's news\b",
-
-]
-
 
 def needs_web_search(message):
 
@@ -752,637 +932,588 @@ def needs_web_search(message):
         message
     ).lower()
 
-
-    if not text:
-
-        return False
-
-
-    for pattern in CURRENT_QUESTION_PATTERNS:
-
-        if re.search(
-            pattern,
-            text
-        ):
-
-            return True
-
-
-    # Direct current-information questions.
-    current_question_patterns = [
-
-        r"^what is .* now\??$",
-
-        r"^what's .* now\??$",
-
-        r"^who is .* now\??$",
-
-        r"^where is .* now\??$",
-
-        r"^how much is .* now\??$",
-
-        r"^how much does .* cost now\??$",
-
-        r"^is .* available now\??$",
-
+    keywords = [
+        "latest",
+        "today",
+        "current",
+        "currently",
+        "news",
+        "recent",
+        "this week",
+        "this month",
+        "price",
+        "prices",
+        "weather",
+        "stock price",
+        "exchange rate",
+        "who is the current",
+        "what happened today",
+        "latest update",
     ]
 
-
-    for pattern in current_question_patterns:
-
-        if re.search(
-            pattern,
-            text
-        ):
-
-            return True
-
-
-    return False
+    return any(
+        keyword in text
+        for keyword in keywords
+    )
 
 
 # ============================================================
-# WEB EVIDENCE FORMATTER
+# LANGUAGE INSTRUCTIONS
 # ============================================================
 
-def format_web_sources(results):
+def build_language_instructions(
+    language_code,
+    language_name,
+    native_name
+):
 
-    if not results:
+    return f"""
+LANGUAGE RULE:
 
-        return []
+The user's detected language is the priority.
 
+Detected language:
+{language_name} ({language_code})
 
-    formatted = []
+Native language name:
+{native_name}
 
+Answer in the same language as the user's message.
 
-    for result in results:
+Do not unnecessarily switch to English.
 
-        formatted.append({
+Do not translate the user's question unless the user asks
+for translation.
 
-            "source":
-                result.get(
-                    "source",
-                    ""
-                ),
+Do not repeat the user's question.
 
-            "title":
-                result.get(
-                    "title",
-                    ""
-                ),
-
-            "url":
-                result.get(
-                    "url",
-                    ""
-                ),
-
-            "text":
-                result.get(
-                    "text",
-                    ""
-                )
-        })
-
-
-    return formatted
+Give the actual answer.
+"""
 
 
 # ============================================================
-# SOURCE SECTION
+# RESPONSE CLEANING / ANTI-REPETITION
 # ============================================================
 
-def build_source_section(results):
+def clean_repeated_response(answer):
 
-    if not results:
+    answer = safe_string(
+        answer
+    )
 
-        return ""
+    if not answer:
+        return answer
 
-
-    lines = [
+    answer = re.sub(
+        r"<think>.*?</think>",
         "",
-        "Sources:"
+        answer,
+        flags=re.DOTALL | re.IGNORECASE
+    ).strip()
+
+    prefixes = [
+        "Thinking...",
+        "Let me think...",
+        "Let me analyze...",
+        "Let me analyse...",
+        "First, I need to understand...",
     ]
 
+    changed = True
 
-    number = 1
+    while changed:
 
+        changed = False
 
-    for result in results:
+        for prefix in prefixes:
 
-        source = safe_string(
-            result.get(
-                "source",
-                ""
-            )
-        )
+            if answer.lower().startswith(
+                prefix.lower()
+            ):
 
-        title = safe_string(
-            result.get(
-                "title",
-                ""
-            )
-        )
+                answer = answer[
+                    len(prefix):
+                ].strip()
 
-        url = safe_string(
-            result.get(
-                "url",
-                ""
-            )
-        )
+                changed = True
 
+    lines = answer.splitlines()
 
-        if not url:
+    cleaned_lines = []
+    seen_lines = set()
 
+    for line in lines:
+
+        clean_line = line.strip()
+
+        if not clean_line:
             continue
 
-
-        lines.append(
-            f"{number}. {source} — {title}"
+        normalized = re.sub(
+            r"\s+",
+            " ",
+            clean_line.lower()
         )
 
-        lines.append(
-            f"   {url}"
+        if normalized in seen_lines:
+            continue
+
+        seen_lines.add(
+            normalized
         )
 
+        cleaned_lines.append(
+            clean_line
+        )
 
-        number += 1
+    answer = "\n".join(
+        cleaned_lines
+    ).strip()
 
+    sentences = re.split(
+        r"(?<=[.!?])\s+",
+        answer
+    )
 
-    return "\n".join(lines)
+    final_sentences = []
+    seen_sentences = set()
+
+    for sentence in sentences:
+
+        sentence = sentence.strip()
+
+        if not sentence:
+            continue
+
+        normalized = re.sub(
+            r"\s+",
+            " ",
+            sentence.lower()
+        ).strip()
+
+        if normalized in seen_sentences:
+            continue
+
+        seen_sentences.add(
+            normalized
+        )
+
+        final_sentences.append(
+            sentence
+        )
+
+    answer = " ".join(
+        final_sentences
+    ).strip()
+
+    words = answer.split()
+
+    if len(words) >= 30:
+
+        max_block = min(
+            20,
+            len(words) // 2
+        )
+
+        for size in range(
+            5,
+            max_block + 1
+        ):
+
+            first = [
+                re.sub(
+                    r"[^\w]",
+                    "",
+                    word.lower()
+                )
+                for word in words[:size]
+            ]
+
+            second = [
+                re.sub(
+                    r"[^\w]",
+                    "",
+                    word.lower()
+                )
+                for word in words[size:size * 2]
+            ]
+
+            if (
+                first
+                and first == second
+            ):
+
+                answer = " ".join(
+                    words[:size]
+                ).strip()
+
+                break
+
+    return answer
 
 
 # ============================================================
-# MAIN AI FUNCTION
+# OLLAMA
 # ============================================================
 
 def ask_ollama(
     user_message,
-    memory_text="",
-    conversation_text="",
-    web_evidence=None,
-    document_evidence=""
+    language="en-ZA",
+    memory_context="",
+    conversation_context="",
+    web_context="",
+    document_context=""
 ):
 
-    web_evidence = web_evidence or []
+    language_code = get_language_code(
+        language
+    )
 
+    language_name = get_language_name(
+        language
+    )
 
-    system_prompt = """
-You are The Fix.
+    native_name = get_language_native_name(
+        language
+    )
 
-Your name is The Fix.
+    has_web = bool(
+        web_context
+    )
 
-You are an independent AI assistant.
+    has_document = bool(
+        document_context
+    )
 
-You must be helpful, accurate, clear and honest.
+    selected_model, route = choose_model(
+        user_message,
+        language_code,
+        has_web,
+        has_document
+    )
 
-============================================================
-MEMORY RULES
-============================================================
+    system_prompt = f"""
+You are The Fix, a helpful general-purpose AI assistant.
 
-USER MEMORY contains information that The Fix has saved about
-the user.
+{build_language_instructions(
+    language_code,
+    language_name,
+    native_name
+)}
 
-You MUST use USER MEMORY when answering questions about the
-user.
+RESPONSE STYLE:
 
-If the user asks:
-
-"What is my favorite color?"
-
-and USER MEMORY says:
-
-favorite color: blue
-
-then answer:
-
-"Your favorite color is blue."
-
-Do NOT say:
-
-"I don't have access to personal information about you."
-
-Do NOT ignore USER MEMORY.
-
-If USER MEMORY contains the answer, use it directly.
-
-If USER MEMORY does not contain the answer, honestly say that
-you do not have that information saved.
-
-============================================================
-CONVERSATION RULES
-============================================================
-
-Use RECENT CONVERSATION to understand what the user is talking
-about.
-
-Give priority to the most recent user statement when the user
-asks what they just said.
-
-Do not invent previous conversations.
-
-============================================================
-GENERAL AI RULES
-============================================================
-
-1. Your name is The Fix.
-
-2. Never claim to be human.
-
-3. Never falsely claim to have human consciousness.
-
-4. Never falsely claim to have actual human feelings.
-
-5. You can understand emotional context and respond with
-   empathy.
-
-6. Do not invent facts.
-
-7. Do not invent sources.
-
-8. Do not invent URLs.
-
-9. Answer normal questions using your model knowledge.
-
-10. For mathematical questions, provide the correct result.
-
-11. Keep answers reasonably concise unless the user asks for
-    more detail.
-
-============================================================
-CURRENT INFORMATION RULE
-============================================================
-
-When CURRENT WEB EVIDENCE is provided, use that evidence for
-current-information questions.
-
-Do not invent current events that are not supported by the
-provided evidence.
-
-If the evidence is insufficient, say that the available web
-evidence is insufficient.
-
-============================================================
-DOCUMENT RULE
-============================================================
-
-When DOCUMENT EVIDENCE is provided, use it to answer questions
-about the document.
-
-Do not invent information that is not supported by the document.
-
-============================================================
-IMPORTANT
-============================================================
-
-USER MEMORY is information about the user.
-
-Use it.
-
-Do not ignore it.
-
-Do not claim that you cannot access it when it is explicitly
-provided below.
+- Answer the user's actual question.
+- Be clear.
+- Be direct.
+- Be straightforward.
+- Do not add unnecessary introductions.
+- Do not repeat yourself.
+- Never repeat the same sentence.
+- Never repeat the same paragraph.
+- Do not repeat the same idea unnecessarily.
+- Do not repeat the user's question.
+- Keep greetings very short.
+- Keep simple questions short.
+- Give more detail when the question requires it.
+- For calculations, show the necessary working.
+- For technical questions, explain clearly.
+- Do not expose internal reasoning.
+- Do not generate a long explanation for a simple greeting.
+- Output only the final answer.
 """
 
+    if language_code == "zu-ZA":
+
+        system_prompt += """
+FOR ISIZULU:
+
+Respond naturally in isiZulu.
+
+Use simple, understandable isiZulu.
+
+Answer the user's actual request.
+
+Do not refuse normal greetings.
+
+Do not say that you cannot translate or answer unless
+the request genuinely requires that.
+
+Do not repeat sentences.
+
+Do not repeat the question.
+
+Do not switch to English unnecessarily.
+
+English technical terms may be used when necessary.
+"""
 
     messages = [
-
         {
             "role": "system",
             "content": system_prompt
         }
-
     ]
 
+    if memory_context:
 
-    # ========================================================
-    # USER MEMORY
-    # ========================================================
-
-    if memory_text:
+        memory_text = str(
+            memory_context
+        )[:2000]
 
         messages.append({
-
             "role": "system",
-
-            "content":
-                """
-USER MEMORY:
-
-The following information is saved about this user.
-
-Use this information when it is relevant.
-
-Do not deny access to this information.
-
-"""
+            "content": (
+                "Relevant memory:\n"
                 + memory_text
+            )
         })
 
-
-    # ========================================================
-    # RECENT CONVERSATION
-    # ========================================================
-
-    if conversation_text:
+    if conversation_context:
 
         messages.append({
-
             "role": "system",
-
-            "content":
-                "RECENT CONVERSATION:\n"
-                + conversation_text
+            "content": (
+                "Recent conversation:\n"
+                + conversation_context
+            )
         })
 
+    if document_context:
 
-    # ========================================================
-    # DOCUMENT EVIDENCE
-    # ========================================================
-
-    if document_evidence:
+        document_text = str(
+            document_context
+        )[:5000]
 
         messages.append({
-
             "role": "system",
-
-            "content":
-                """
-DOCUMENT EVIDENCE:
-
-Use the following document information to answer the user's
-document question.
-
-"""
-                + document_evidence
+            "content": (
+                "Relevant document information:\n"
+                + document_text
+            )
         })
 
+    if web_context:
 
-    # ========================================================
-    # WEB EVIDENCE
-    # ========================================================
-
-    if web_evidence:
-
-        evidence_lines = []
-
-
-        for index, result in enumerate(
-            web_evidence,
-            start=1
-        ):
-
-            source = safe_string(
-                result.get(
-                    "source",
-                    "Unknown source"
-                )
-            )
-
-            title = safe_string(
-                result.get(
-                    "title",
-                    ""
-                )
-            )
-
-            url = safe_string(
-                result.get(
-                    "url",
-                    ""
-                )
-            )
-
-            text = safe_string(
-                result.get(
-                    "text",
-                    ""
-                )
-            )
-
-
-            evidence_lines.append(
-                f"""
-SOURCE {index}
-Source: {source}
-Title: {title}
-URL: {url}
-Evidence: {text}
-"""
-            )
-
-
-        web_block = "\n".join(
-            evidence_lines
-        )
-
+        web_text = str(
+            web_context
+        )[:5000]
 
         messages.append({
-
             "role": "system",
-
-            "content":
-                """
-CURRENT WEB EVIDENCE:
-
-Use the supplied evidence when answering current-information
-questions.
-
-Do not invent additional current facts.
-
-"""
-                + web_block
+            "content": (
+                "Relevant current web information:\n"
+                + web_text
+            )
         })
-
-
-    # ========================================================
-    # USER MESSAGE
-    # ========================================================
 
     messages.append({
-
         "role": "user",
-
-        "content":
-            safe_string(user_message)
+        "content": safe_string(
+            user_message
+        )
     })
 
+    powerful = (
+        selected_model == POWERFUL_MODEL
+    )
 
-    # ========================================================
-    # OLLAMA REQUEST
-    # ========================================================
+    morena = (
+        selected_model == MORENA_MODEL
+    )
+
+    if powerful:
+
+        max_tokens = 280
+        request_timeout = 120
+        keep_alive = POWERFUL_KEEP_ALIVE
+
+        temperature = 0.15
+        repeat_penalty = 1.10
+        repeat_last_n = 128
+
+    elif morena:
+
+        max_tokens = 150
+        request_timeout = 60
+        keep_alive = MORENA_KEEP_ALIVE
+
+        temperature = 0.15
+        repeat_penalty = 1.18
+        repeat_last_n = 128
+
+    else:
+
+        max_tokens = 110
+        request_timeout = 35
+        keep_alive = FAST_KEEP_ALIVE
+
+        temperature = 0.15
+        repeat_penalty = 1.10
+        repeat_last_n = 128
 
     payload = {
-
-        "model":
-            OLLAMA_MODEL,
-
-        "messages":
-            messages,
-
-        "stream":
-            False,
-
-        "think":
-            False,
+        "model": selected_model,
+        "messages": messages,
+        "stream": False,
+        "think": False,
+        "keep_alive": keep_alive,
 
         "options": {
-
-            "temperature":
-                0.1
+            "temperature": temperature,
+            "num_predict": max_tokens,
+            "repeat_penalty": repeat_penalty,
+            "repeat_last_n": repeat_last_n,
         }
     }
 
+    start_time = time.time()
 
     try:
 
         response = requests.post(
-
             OLLAMA_URL,
-
             json=payload,
-
-            timeout=180
+            timeout=request_timeout
         )
 
+        elapsed = round(
+            time.time() - start_time,
+            2
+        )
 
-        response.raise_for_status()
+        if response.status_code != 200:
 
+            return (
+                (
+                    "The Fix could not complete the request. "
+                    f"Ollama returned HTTP "
+                    f"{response.status_code}."
+                ),
+                selected_model,
+                route,
+                elapsed
+            )
 
         data = response.json()
 
+        message_data = data.get(
+            "message",
+            {}
+        )
 
-        answer = (
-
-            data
-            .get(
-                "message",
-                {}
-            )
-            .get(
+        answer = safe_string(
+            message_data.get(
                 "content",
                 ""
             )
         )
 
+        if not answer:
 
-        answer = clean_answer(
+            answer = (
+                "The Fix received an empty response."
+            )
+
+        answer = clean_repeated_response(
             answer
         )
 
-
         if not answer:
 
-            return (
-                "The Fix could not generate an answer."
+            answer = (
+                "The Fix could not produce a final answer."
             )
 
-
-        return answer
-
+        return (
+            answer,
+            selected_model,
+            route,
+            elapsed
+        )
 
     except requests.exceptions.Timeout:
 
         return (
-            "The local AI model took too long to respond. "
-            "Please try again."
+            (
+                "The Fix is taking longer than expected. "
+                "Please try the question again."
+            ),
+            selected_model,
+            route,
+            round(
+                time.time() - start_time,
+                2
+            )
         )
-
 
     except requests.exceptions.ConnectionError:
 
         return (
-            "The local Ollama service is not available. "
-            "Please make sure Ollama is running."
+            (
+                "The Fix cannot connect to Ollama. "
+                "Please make sure Ollama is running."
+            ),
+            selected_model,
+            route,
+            round(
+                time.time() - start_time,
+                2
+            )
         )
 
-
-    except Exception as error:
+    except Exception as e:
 
         return (
-            "The Fix could not generate an answer right now. "
-            f"Error: {error}"
+            f"The Fix encountered an error: {str(e)}",
+            selected_model,
+            route,
+            round(
+                time.time() - start_time,
+                2
+            )
         )
 
 
 # ============================================================
-# WEB ANSWER CLEANUP
-# ============================================================
-
-def validate_web_answer(
-    answer,
-    web_results
-):
-
-    if not answer:
-
-        return (
-            "I could not generate a reliable answer from "
-            "the available web evidence."
-        )
-
-
-    if not web_results:
-
-        return answer
-
-
-    suspicious_phrases = [
-
-        "i browsed the internet",
-
-        "i personally checked",
-
-        "i searched the internet",
-
-        "according to my knowledge today"
-    ]
-
-
-    for phrase in suspicious_phrases:
-
-        answer = re.sub(
-
-            re.escape(phrase),
-
-            "",
-
-            answer,
-
-            flags=re.IGNORECASE
-        )
-
-
-    return answer.strip()
-
-
-# ============================================================
-# ROOT
+# ROOT + FRONTEND
 # ============================================================
 
 @app.get("/")
 def root():
 
+    if FRONTEND_FILE.exists():
+
+        return FileResponse(
+            str(FRONTEND_FILE),
+            media_type="text/html"
+        )
+
     return {
+        "name": APP_NAME,
+        "version": APP_VERSION,
+        "status": "online",
+        "engine": "Ollama + SymPy",
+        "model": OLLAMA_MODEL,
+        "morena_model": MORENA_MODEL,
+        "math_engine": "SymPy 1.14.0",
+        "message": "The Fix API is running.",
+        "frontend": "not found"
+    }
 
-        "name":
-            APP_NAME,
 
-        "version":
-            APP_VERSION,
+@app.get("/api")
+def api_root():
 
-        "status":
-            "online",
-
-        "engine":
-            "Ollama",
-
-        "model":
-            OLLAMA_MODEL,
-
-        "message":
-            "The Fix API is running."
+    return {
+        "name": APP_NAME,
+        "version": APP_VERSION,
+        "status": "online",
+        "engine": "Ollama + SymPy",
+        "model": OLLAMA_MODEL,
+        "morena_model": MORENA_MODEL,
+        "math_engine": "SymPy 1.14.0",
+        "message": "The Fix API is running."
     }
 
 
@@ -1393,22 +1524,76 @@ def root():
 @app.get("/health")
 def health():
 
+    models = get_available_models(
+        force=True
+    )
+
     return {
+        "status": "online",
+        "name": APP_NAME,
+        "version": APP_VERSION,
+        "ollama": True,
+        "math_engine": True,
+        "math_engine_name": "SymPy 1.14.0",
+        "available_models": models,
 
-        "name":
-            APP_NAME,
+        "fast_model": FAST_MODEL,
+        "powerful_model": POWERFUL_MODEL,
+        "vision_model": VISION_MODEL,
+        "morena_model": MORENA_MODEL,
 
-        "version":
-            APP_VERSION,
+        "fast_available": FAST_MODEL in models,
+        "powerful_available": POWERFUL_MODEL in models,
+        "vision_available": VISION_MODEL in models,
+        "morena_available": MORENA_MODEL in models
+    }
 
-        "api":
-            "online",
 
-        "ollama":
-            ollama_available(),
+# ============================================================
+# MODELS
+# ============================================================
 
-        "model":
-            OLLAMA_MODEL
+@app.get("/models")
+def models():
+
+    available = get_available_models(
+        force=True
+    )
+
+    return {
+        "success": True,
+
+        "fast_model": FAST_MODEL,
+        "powerful_model": POWERFUL_MODEL,
+        "vision_model": VISION_MODEL,
+        "morena_model": MORENA_MODEL,
+
+        "available_models": available,
+
+        "fast_available": FAST_MODEL in available,
+        "powerful_available": POWERFUL_MODEL in available,
+        "vision_available": VISION_MODEL in available,
+        "morena_available": MORENA_MODEL in available
+    }
+
+
+# ============================================================
+# LANGUAGES
+# ============================================================
+
+@app.get("/languages")
+def languages():
+
+    return {
+        "success": True,
+        "languages": LANGUAGES,
+        "native_names": LANGUAGE_NATIVE_NAMES,
+        "multilingual_languages": list(
+            MULTILINGUAL_LANGUAGES
+        ),
+        "african_languages": list(
+            AFRICAN_LANGUAGES
+        )
     }
 
 
@@ -1421,45 +1606,40 @@ def register(
     request: RegisterRequest
 ):
 
+    username = safe_string(
+        request.username
+    )
+
+    password = safe_string(
+        request.password
+    )
+
+    if not username:
+
+        raise HTTPException(
+            status_code=400,
+            detail="Username is required."
+        )
+
+    if not password:
+
+        raise HTTPException(
+            status_code=400,
+            detail="Password is required."
+        )
+
     try:
 
-        user = create_user(
-
-            request.username,
-
-            request.email,
-
-            request.password
+        return create_user(
+            username,
+            password
         )
 
-
-        return {
-
-            "success":
-                True,
-
-            "user":
-                user
-        }
-
-
-    except ValueError as error:
+    except Exception as e:
 
         raise HTTPException(
-
             status_code=400,
-
-            detail=str(error)
-        )
-
-
-    except Exception as error:
-
-        raise HTTPException(
-
-            status_code=500,
-
-            detail=str(error)
+            detail=str(e)
         )
 
 
@@ -1472,138 +1652,120 @@ def login(
     request: LoginRequest
 ):
 
-    user = authenticate_user(
+    try:
 
-        request.username,
+        result = authenticate_user(
+            request.username,
+            request.password
+        )
 
-        request.password
-    )
+        if not result:
 
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid username or password."
+            )
 
-    if not user:
+        return result
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
 
         raise HTTPException(
-
-            status_code=401,
-
-            detail="Invalid username or password."
+            status_code=500,
+            detail=str(e)
         )
 
 
-    return {
-
-        "success":
-            True,
-
-        "user":
-            user
-    }
-
-
 # ============================================================
-# USER PROFILE
+# USER
 # ============================================================
 
 @app.get("/user/{user_id}")
-def user_profile(
+def user(
     user_id: str
 ):
 
-    user = get_user(
-        user_id
-    )
+    try:
 
+        result = get_user(
+            user_id
+        )
 
-    if not user:
+        if not result:
+
+            raise HTTPException(
+                status_code=404,
+                detail="User not found."
+            )
+
+        return result
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
 
         raise HTTPException(
-
-            status_code=404,
-
-            detail="User not found."
+            status_code=500,
+            detail=str(e)
         )
 
 
-    return user
-
-
 # ============================================================
-# SAVE MEMORY
+# MEMORY
 # ============================================================
 
 @app.post("/memory")
-def save_user_memory(
+def save_memory(
     request: MemoryRequest
 ):
 
     try:
 
         result = remember(
-
             request.user_id,
-
             request.key,
-
             request.value
         )
 
-
         return {
-
-            "success":
-                True,
-
-            "memory":
-                result
+            "success": True,
+            "result": result
         }
 
-
-    except Exception as error:
+    except Exception as e:
 
         raise HTTPException(
-
             status_code=500,
-
-            detail=str(error)
+            detail=str(e)
         )
 
 
-# ============================================================
-# READ MEMORY
-# ============================================================
-
 @app.get("/memory/{user_id}")
-def read_user_memory(
+def memory(
     user_id: str
 ):
 
     try:
 
         return {
-
-            "user_id":
-                user_id,
-
-            "memories":
-                get_memories(
-                    user_id
-                )
+            "success": True,
+            "user_id": user_id,
+            "memories": get_memories(
+                user_id
+            )
         }
 
-
-    except Exception as error:
+    except Exception as e:
 
         raise HTTPException(
-
             status_code=500,
-
-            detail=str(error)
+            detail=str(e)
         )
 
-
-# ============================================================
-# MEMORY SUMMARY
-# ============================================================
 
 @app.get("/memory-summary/{user_id}")
 def memory_summary(
@@ -1612,24 +1774,21 @@ def memory_summary(
 
     try:
 
-        return get_memory_summary(
-            user_id
-        )
+        return {
+            "success": True,
+            "user_id": user_id,
+            "summary": get_memory_summary(
+                user_id
+            )
+        }
 
-
-    except Exception as error:
+    except Exception as e:
 
         raise HTTPException(
-
             status_code=500,
-
-            detail=str(error)
+            detail=str(e)
         )
 
-
-# ============================================================
-# FORGET MEMORY
-# ============================================================
 
 @app.post("/forget")
 def forget_memory(
@@ -1639,30 +1798,20 @@ def forget_memory(
     try:
 
         result = forget(
-
             request.user_id,
-
             request.key
         )
 
-
         return {
-
-            "success":
-                True,
-
-            "result":
-                result
+            "success": True,
+            "result": result
         }
 
-
-    except Exception as error:
+    except Exception as e:
 
         raise HTTPException(
-
             status_code=500,
-
-            detail=str(error)
+            detail=str(e)
         )
 
 
@@ -1678,61 +1827,42 @@ def conversation(
     try:
 
         return {
-
-            "user_id":
-                user_id,
-
-            "conversation":
-                get_conversation_history(
-                    user_id
-                )
+            "success": True,
+            "user_id": user_id,
+            "conversation": get_conversation_history(
+                user_id
+            )
         }
 
-
-    except Exception as error:
+    except Exception as e:
 
         raise HTTPException(
-
             status_code=500,
-
-            detail=str(error)
+            detail=str(e)
         )
 
 
-# ============================================================
-# CLEAR CONVERSATION
-# ============================================================
-
 @app.post("/conversation/clear")
 def clear_conversation(
-    request: ClearConversationRequest
+    request: ConversationClearRequest
 ):
 
     try:
 
         result = clear_conversation_history(
-
             request.user_id
         )
 
-
         return {
-
-            "success":
-                True,
-
-            "result":
-                result
+            "success": True,
+            "result": result
         }
 
-
-    except Exception as error:
+    except Exception as e:
 
         raise HTTPException(
-
             status_code=500,
-
-            detail=str(error)
+            detail=str(e)
         )
 
 
@@ -1745,6 +1875,8 @@ def chat(
     request: ChatRequest
 ):
 
+    start_time = time.time()
+
     user_id = safe_string(
         request.user_id
     )
@@ -1753,215 +1885,375 @@ def chat(
         request.message
     )
 
+    requested_language = get_language_code(
+        request.language
+    )
+
+    if not user_id:
+
+        raise HTTPException(
+            status_code=400,
+            detail="user_id is required."
+        )
 
     if not message:
 
         raise HTTPException(
-
             status_code=400,
-
-            detail="Message cannot be empty."
+            detail="message is required."
         )
 
+    # ========================================================
+    # AUTOMATIC INPUT LANGUAGE DETECTION
+    # ========================================================
+
+    language = detect_input_language(
+        message,
+        requested_language
+    )
 
     # ========================================================
-    # CALCULATOR
+    # BASIC CALCULATOR
     # ========================================================
 
-    calculator_result = use_calculator(
+    try:
+
+        calculator_result = use_calculator(
+            message
+        )
+
+        if calculator_result is not None:
+
+            answer = str(
+                calculator_result
+            )
+
+            try:
+
+                add_conversation(
+                    user_id,
+                    message,
+                    answer
+                )
+
+            except Exception:
+                pass
+
+            return {
+                "name": APP_NAME,
+                "version": APP_VERSION,
+                "user_id": user_id,
+                "message": message,
+                "language": language,
+                "language_name": get_language_name(
+                    language
+                ),
+                "language_native_name": get_language_native_name(
+                    language
+                ),
+                "engine": "Calculator",
+                "model": "calculator",
+                "route": "calculator",
+                "web_search": False,
+                "memory_saved": False,
+                "response_time": round(
+                    time.time() - start_time,
+                    3
+                ),
+                "answer": answer
+            }
+
+    except Exception:
+        pass
+
+    # ========================================================
+    # ADVANCED MATHEMATICS ENGINE
+    # ========================================================
+
+    try:
+
+        math_result = solve_math(
+            message
+        )
+
+        if math_result is not None:
+
+            math_answer = math_result.get(
+                "answer",
+                ""
+            )
+
+            math_steps = math_result.get(
+                "steps",
+                []
+            )
+
+            if math_steps:
+
+                answer_parts = []
+
+                for step in math_steps:
+
+                    answer_parts.append(
+                        str(step)
+                    )
+
+                answer = "\n".join(
+                    answer_parts
+                )
+
+            else:
+
+                answer = str(
+                    math_answer
+                )
+
+            try:
+
+                add_conversation(
+                    user_id,
+                    message,
+                    answer
+                )
+
+            except Exception:
+                pass
+
+            return {
+                "name": APP_NAME,
+                "version": APP_VERSION,
+                "user_id": user_id,
+                "message": message,
+                "language": language,
+                "language_name": get_language_name(
+                    language
+                ),
+                "language_native_name": get_language_native_name(
+                    language
+                ),
+                "engine": "SymPy",
+                "model": "sympy-1.14.0",
+                "route": "advanced-mathematics",
+                "web_search": False,
+                "memory_saved": False,
+                "model_response_time": 0.0,
+                "total_response_time": round(
+                    time.time() - start_time,
+                    3
+                ),
+                "answer": answer
+            }
+
+    except Exception:
+        pass
+
+    # ========================================================
+    # GREETINGS
+    # ========================================================
+
+    greeting = detect_greeting(
         message
     )
 
+    if greeting:
 
-    if calculator_result:
-
-        answer = (
-
-            f"The answer is "
-            f"{calculator_result['result']}."
+        answer = greeting_response(
+            language
         )
-
 
         try:
 
             add_conversation(
-
                 user_id,
-
-                "user",
-
-                message
-            )
-
-
-            add_conversation(
-
-                user_id,
-
-                "assistant",
-
+                message,
                 answer
             )
 
         except Exception:
-
             pass
 
-
         return {
-
-            "name":
-                APP_NAME,
-
-            "user_id":
-                user_id,
-
-            "message":
-                message,
-
-            "tool":
-                "calculator",
-
-            "expression":
-                calculator_result[
-                    "expression"
-                ],
-
-            "answer":
-                answer
+            "name": APP_NAME,
+            "version": APP_VERSION,
+            "user_id": user_id,
+            "message": message,
+            "language": language,
+            "language_name": get_language_name(
+                language
+            ),
+            "language_native_name": get_language_native_name(
+                language
+            ),
+            "engine": "The Fix",
+            "model": "local-response",
+            "route": "greeting",
+            "web_search": False,
+            "memory_saved": False,
+            "model_response_time": 0.0,
+            "total_response_time": round(
+                time.time() - start_time,
+                3
+            ),
+            "answer": answer
         }
 
-
     # ========================================================
-    # AUTOMATIC MEMORY
+    # MEMORY
     # ========================================================
 
-    automatic_memory = save_automatic_memory(
-
+    memory_saved = detect_and_save_memory(
         user_id,
-
         message
     )
 
-
-    # ========================================================
-    # LOAD MEMORY
-    # ========================================================
-
-    memory_text = build_memory_text(
+    memory_context = get_memory_context(
         user_id
     )
 
-
-    # ========================================================
-    # LOAD CONVERSATION
-    # ========================================================
-
-    conversation_text = (
-        build_conversation_text(
-            user_id
-        )
+    conversation_context = get_conversation_context(
+        user_id
     )
 
-
     # ========================================================
-    # WEB SEARCH
+    # WEB
     # ========================================================
 
-    web_results = []
-
+    web_context = ""
+    web_used = False
+    web_sources = []
 
     if needs_web_search(
         message
     ):
 
-        search_result = web_search(
-            message
-        )
+        try:
 
-
-        if search_result.get(
-            "success",
-            False
-        ):
-
-            web_results = (
-
-                search_result.get(
-
-                    "results",
-
-                    []
-                )
+            web_result = web_search(
+                message
             )
 
+            if web_result:
+
+                web_used = True
+
+                if isinstance(
+                    web_result,
+                    dict
+                ):
+
+                    web_context = str(
+                        web_result.get(
+                            "answer",
+                            web_result
+                        )
+                    )
+
+                    web_sources = web_result.get(
+                        "sources",
+                        []
+                    )
+
+                else:
+
+                    web_context = str(
+                        web_result
+                    )
+
+        except Exception:
+
+            web_context = ""
 
     # ========================================================
-    # ASK THE FIX
+    # ASK MODEL
     # ========================================================
 
-    answer = ask_ollama(
-
-        user_message=
-            message,
-
-        memory_text=
-            memory_text,
-
-        conversation_text=
-            conversation_text,
-
-        web_evidence=
-            format_web_sources(
-                web_results
-            )
+    answer, selected_model, route, model_time = ask_ollama(
+        user_message=message,
+        language=language,
+        memory_context=memory_context,
+        conversation_context=conversation_context,
+        web_context=web_context,
+        document_context=""
     )
-
 
     # ========================================================
     # MEMORY CONFIRMATION
     # ========================================================
 
-    if automatic_memory:
+    if memory_saved:
 
-        key = automatic_memory.get(
-            "key",
-            ""
+        confirmations = {
+
+            "en-ZA":
+                " I saved that to your memory.",
+
+            "en-US":
+                " I saved that to your memory.",
+
+            "zu-ZA":
+                " Ngikugcine lokho enkumbulweni yakho.",
+
+            "xh-ZA":
+                " Ndikugcine oko kwinkumbulo yakho.",
+
+            "st-ZA":
+                " Ke e bolokile seo mohopolong wa hao.",
+
+            "af-ZA":
+                " Ek het dit in jou geheue gestoor.",
+
+            "tn-ZA":
+                " Ke go bolokile seo mo kgopolong ya gago.",
+
+            "nso-ZA":
+                " Ke e bolokile mo kgopolong ya gago.",
+
+            "ss-ZA":
+                " Ngikugcine loko enkumbulweni yakho.",
+
+            "ts-ZA":
+                " Ndza swi hlayisa eka miehleketo ya wena.",
+
+            "ve-ZA":
+                " Ndo zwi vhulunga kha muhumbulo waṋu.",
+
+            "nr-ZA":
+                " Ngikugcine lokho enkumbulweni yakho."
+        }
+
+        answer += confirmations.get(
+            language,
+            " I saved that to your memory."
         )
-
-        value = automatic_memory.get(
-            "value",
-            ""
-        )
-
-
-        if key and value:
-
-            answer = (
-
-                f"{answer}\n\n"
-                f"I've saved that: {key} = {value}."
-            )
-
 
     # ========================================================
-    # WEB CLEANUP
+    # WEB SOURCES
     # ========================================================
 
-    if web_results:
+    if web_used and web_sources:
 
-        answer = validate_web_answer(
+        if isinstance(
+            web_sources,
+            list
+        ):
 
-            answer,
+            source_text = "\n\nSources:\n"
 
-            web_results
-        )
+            for source in web_sources[:5]:
 
+                source_text += (
+                    f"- {source}\n"
+                )
 
-        answer += build_source_section(
-            web_results
-        )
+            answer += source_text
 
+    # ========================================================
+    # FINAL CLEANUP
+    # ========================================================
+
+    answer = clean_repeated_response(
+        answer
+    )
 
     # ========================================================
     # SAVE CONVERSATION
@@ -1970,122 +2262,417 @@ def chat(
     try:
 
         add_conversation(
-
             user_id,
-
-            "user",
-
-            message
-        )
-
-
-        add_conversation(
-
-            user_id,
-
-            "assistant",
-
+            message,
             answer
         )
 
     except Exception:
-
         pass
-
 
     # ========================================================
     # RESPONSE
     # ========================================================
 
-    response = {
-
-        "name":
-            APP_NAME,
-
-        "version":
-            APP_VERSION,
-
-        "user_id":
-            user_id,
-
-        "message":
-            message,
-
-        "engine":
-            "Ollama",
-
-        "model":
-            OLLAMA_MODEL,
-
-        "web_search":
-            bool(web_results),
-
-        "memory_saved":
-            bool(automatic_memory),
-
-        "answer":
-            answer
+    return {
+        "name": APP_NAME,
+        "version": APP_VERSION,
+        "user_id": user_id,
+        "message": message,
+        "language": language,
+        "language_name": get_language_name(
+            language
+        ),
+        "language_native_name": get_language_native_name(
+            language
+        ),
+        "engine": "Ollama",
+        "model": selected_model,
+        "route": route,
+        "web_search": web_used,
+        "memory_saved": memory_saved,
+        "model_response_time": model_time,
+        "total_response_time": round(
+            time.time() - start_time,
+            2
+        ),
+        "answer": answer
     }
 
 
-    if automatic_memory:
+# ============================================================
+# DOCUMENT UPLOAD
+# ============================================================
 
-        response["saved_memory"] = {
+@app.post("/upload-document")
+async def upload_document(
+    file: UploadFile = File(...)
+):
 
-            "key":
-                automatic_memory.get(
-                    "key",
-                    ""
-                ),
+    if read_document is None:
 
-            "value":
-                automatic_memory.get(
-                    "value",
-                    ""
-                ),
+        raise HTTPException(
+            status_code=500,
+            detail="Document reader is not available."
+        )
 
-            "category":
-                automatic_memory.get(
-                    "category",
-                    "general"
-                )
+    try:
+
+        content = await file.read()
+
+        if not content:
+
+            raise HTTPException(
+                status_code=400,
+                detail="The uploaded document is empty."
+            )
+
+        documents_folder = os.path.join(
+            os.path.dirname(__file__),
+            "documents"
+        )
+
+        os.makedirs(
+            documents_folder,
+            exist_ok=True
+        )
+
+        filename = safe_string(
+            file.filename
+        )
+
+        if not filename:
+
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid filename."
+            )
+
+        safe_filename = os.path.basename(
+            filename
+        )
+
+        file_path = os.path.join(
+            documents_folder,
+            f"{int(time.time() * 1000)}_{safe_filename}"
+        )
+
+        with open(
+            file_path,
+            "wb"
+        ) as f:
+
+            f.write(content)
+
+        try:
+
+            result = read_document(
+                file_path
+            )
+
+        except TypeError:
+
+            result = read_document(
+                file_path,
+                safe_filename
+            )
+
+        return {
+            "success": True,
+            "filename": os.path.basename(
+                file_path
+            ),
+            "original_filename": safe_filename,
+            "path": file_path,
+            "result": result
         }
 
+    except HTTPException:
+        raise
 
-    if web_results:
+    except Exception as e:
 
-        response["sources"] = [
-
-            {
-
-                "source":
-                    item.get(
-                        "source",
-                        ""
-                    ),
-
-                "title":
-                    item.get(
-                        "title",
-                        ""
-                    ),
-
-                "url":
-                    item.get(
-                        "url",
-                        ""
-                    )
-            }
-
-            for item in web_results
-        ]
-
-
-    return response
+        raise HTTPException(
+            status_code=500,
+            detail=f"Document upload failed: {str(e)}"
+        )
 
 
 # ============================================================
-# PDF UPLOAD
+# DOCUMENT LIST
+# ============================================================
+
+@app.get("/documents")
+def documents():
+
+    documents_folder = os.path.join(
+        os.path.dirname(__file__),
+        "documents"
+    )
+
+    os.makedirs(
+        documents_folder,
+        exist_ok=True
+    )
+
+    files = []
+
+    for filename in os.listdir(
+        documents_folder
+    ):
+
+        path = os.path.join(
+            documents_folder,
+            filename
+        )
+
+        if os.path.isfile(
+            path
+        ):
+
+            files.append({
+                "filename": filename,
+                "size": os.path.getsize(
+                    path
+                )
+            })
+
+    return {
+        "success": True,
+        "documents": files
+    }
+
+
+# ============================================================
+# DOCUMENT SEARCH
+# ============================================================
+
+@app.post("/document-search")
+def document_search(
+    request: DocumentSearchRequest
+):
+
+    if search_document is None:
+
+        raise HTTPException(
+            status_code=500,
+            detail="Document search is not available."
+        )
+
+    try:
+
+        documents_folder = os.path.join(
+            os.path.dirname(__file__),
+            "documents"
+        )
+
+        file_path = os.path.join(
+            documents_folder,
+            os.path.basename(
+                request.filename
+            )
+        )
+
+        if not os.path.exists(
+            file_path
+        ):
+
+            raise HTTPException(
+                status_code=404,
+                detail="Document not found."
+            )
+
+        try:
+
+            result = search_document(
+                file_path,
+                request.query,
+                request.top_k
+            )
+
+        except TypeError:
+
+            result = search_document(
+                file_path,
+                request.query
+            )
+
+        return {
+            "success": True,
+            "filename": request.filename,
+            "query": request.query,
+            "results": result
+        }
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Document search failed: {str(e)}"
+        )
+
+
+# ============================================================
+# DOCUMENT QUESTION
+# ============================================================
+
+@app.post("/document-question")
+def document_question(
+    request: DocumentQuestionRequest
+):
+
+    if search_document is None:
+
+        raise HTTPException(
+            status_code=500,
+            detail="Document search is not available."
+        )
+
+    documents_folder = os.path.join(
+        os.path.dirname(__file__),
+        "documents"
+    )
+
+    file_path = os.path.join(
+        documents_folder,
+        os.path.basename(
+            request.filename
+        )
+    )
+
+    if not os.path.exists(
+        file_path
+    ):
+
+        raise HTTPException(
+            status_code=404,
+            detail="Document not found."
+        )
+
+    try:
+
+        try:
+
+            results = search_document(
+                file_path,
+                request.question,
+                4
+            )
+
+        except TypeError:
+
+            results = search_document(
+                file_path,
+                request.question
+            )
+
+        if isinstance(
+            results,
+            list
+        ):
+
+            evidence_parts = []
+
+            for item in results[:4]:
+
+                if isinstance(
+                    item,
+                    dict
+                ):
+
+                    text = (
+                        item.get("text")
+                        or item.get("content")
+                        or str(item)
+                    )
+
+                else:
+
+                    text = str(item)
+
+                evidence_parts.append(
+                    str(text)[:1400]
+                )
+
+            document_context = (
+                "\n\n---\n\n".join(
+                    evidence_parts
+                )
+            )
+
+        else:
+
+            document_context = str(
+                results
+            )[:5000]
+
+        detected_language = detect_input_language(
+            request.question,
+            request.language
+        )
+
+        answer, selected_model, route, model_time = ask_ollama(
+            user_message=request.question,
+            language=detected_language,
+            memory_context=get_memory_context(
+                request.user_id
+            ),
+            conversation_context=get_conversation_context(
+                request.user_id
+            ),
+            web_context="",
+            document_context=document_context
+        )
+
+        answer = clean_repeated_response(
+            answer
+        )
+
+        try:
+
+            add_conversation(
+                request.user_id,
+                request.question,
+                answer
+            )
+
+        except Exception:
+            pass
+
+        return {
+            "success": True,
+            "name": APP_NAME,
+            "version": APP_VERSION,
+            "filename": request.filename,
+            "language": detected_language,
+            "language_name": get_language_name(
+                detected_language
+            ),
+            "language_native_name": get_language_native_name(
+                detected_language
+            ),
+            "model": selected_model,
+            "route": route,
+            "model_response_time": model_time,
+            "answer": answer
+        }
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Document question failed: {str(e)}"
+        )
+
+
+# ============================================================
+# LEGACY PDF ROUTES
 # ============================================================
 
 @app.post("/upload-pdf")
@@ -2093,346 +2680,63 @@ async def upload_pdf(
     file: UploadFile = File(...)
 ):
 
-    if not file.filename:
-        raise HTTPException(
-            status_code=400,
-            detail="File name is missing."
-        )
-
-    allowed_extensions = {
-        ".pdf",
-        ".docx",
-        ".pptx",
-        ".xlsx",
-        ".txt"
-    }
-
-    extension = os.path.splitext(
-        file.filename
-    )[1].lower()
-
-    if extension not in allowed_extensions:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "Unsupported document type. "
-                "Supported files: PDF, DOCX, PPTX, XLSX and TXT."
-            )
-        )
-
-    if read_document is None:
-        raise HTTPException(
-            status_code=500,
-            detail="Document reader is not available."
-        )
-
-    try:
-        content = await file.read()
-
-        safe_filename = os.path.basename(
-            file.filename
-        )
-
-        stored_filename = (
-            str(int(time.time() * 1000))
-            + "_"
-            + safe_filename
-        )
-
-        temp_filename = os.path.join(
-            "documents",
-            stored_filename
-        )
-
-        with open(
-            temp_filename,
-            "wb"
-        ) as output:
-            output.write(content)
-
-        text = read_document(
-            temp_filename
-        )
-
-        return {
-    "success": True,
-    "filename": file.filename,
-    "stored_filename": stored_filename,
-    "type": extension,
-    "characters": len(text),
-    "stored_filename": stored_filename,
-    "text": text
-    
-}
-
-    except Exception as error:
-        raise HTTPException(
-            status_code=500,
-            detail=str(error)
-        )
-# ============================================================
-# PDF SEARCH
-# ============================================================
-
-@app.get("/documents")
-def list_documents():
-
-    documents_folder = "documents"
-
-    if not os.path.exists(documents_folder):
-        return {
-            "success": True,
-            "documents": []
-        }
-
-    document_files = os.listdir(
-        documents_folder
+    return await upload_document(
+        file
     )
 
-    documents = []
-
-    for filename in document_files:
-
-        file_path = os.path.join(
-            documents_folder,
-            filename
-        )
-
-        if os.path.isfile(file_path):
-
-            documents.append({
-                "filename": filename,
-                "size": os.path.getsize(file_path)
-            })
-
-    documents.sort(
-        key=lambda item: item["filename"],
-        reverse=True
-    )
-
-    return {
-        "success": True,
-        "documents": documents
-    }
 
 @app.post("/pdf-search")
 def pdf_search(
-    request: PDFSearchRequest
+    request: DocumentSearchRequest
 ):
 
-    if search_document is None:
-        raise HTTPException(
-            status_code=500,
-            detail="Document search is not available."
-        )
+    return document_search(
+        request
+    )
 
-    if read_document is None:
-        raise HTTPException(
-            status_code=500,
-            detail="Document reader is not available."
-        )
-
-    try:
-
-        documents_folder = "documents"
-
-        if not os.path.exists(documents_folder):
-            raise HTTPException(
-                status_code=404,
-                detail="Documents folder was not found."
-            )
-
-        safe_filename = os.path.basename(
-            request.filename
-        )
-
-        if safe_filename != request.filename:
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid document filename."
-            )
-
-        filename = os.path.join(
-            documents_folder,
-            safe_filename
-        )
-
-        if not os.path.isfile(filename):
-            raise HTTPException(
-                status_code=404,
-                detail="Selected document was not found."
-            )
-
-        text = read_document(
-            filename
-        )
-
-        results = search_document(
-            text,
-            request.query
-        )
-
-        return {
-            "success": True,
-            "query": request.query,
-            "document": safe_filename,
-            "results": results
-        }
-
-    except HTTPException:
-        raise
-
-    except Exception as error:
-        raise HTTPException(
-            status_code=500,
-            detail=str(error)
-        )
-# ============================================================
-# PDF QUESTION
-# ============================================================
 
 @app.post("/pdf-question")
 def pdf_question(
-    request: PDFQuestionRequest
+    request: DocumentQuestionRequest
 ):
 
-    if search_document is None:
-        raise HTTPException(
-            status_code=500,
-            detail="Document search is not available."
-        )
+    return document_question(
+        request
+    )
 
-    if read_document is None:
-        raise HTTPException(
-            status_code=500,
-            detail="Document reader is not available."
-        )
 
-    try:
-
-        documents_folder = "documents"
-
-        if not os.path.exists(documents_folder):
-            raise HTTPException(
-                status_code=404,
-                detail="Documents folder was not found."
-            )
-
-        # Use the document selected by the user.
-        safe_filename = os.path.basename(
-            request.filename
-        )
-
-        # Prevent unsafe file paths.
-        if safe_filename != request.filename:
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid document filename."
-            )
-
-        filename = os.path.join(
-            documents_folder,
-            safe_filename
-        )
-
-        # Check that the selected document exists.
-        if not os.path.isfile(filename):
-            raise HTTPException(
-                status_code=404,
-                detail="Selected document was not found."
-            )
-
-        # Read the selected document.
-        text = read_document(
-            filename
-        )
-
-        # Search only inside the selected document.
-        results = search_document(
-            text,
-            request.question
-        )
-
-        if not results:
-            return {
-                "success": False,
-                "question": request.question,
-                "document": safe_filename,
-                "answer": (
-                    "I could not find relevant information "
-                    "in the selected document."
-                )
-            }
-
-        evidence_parts = []
-
-        for result in results[:8]:
-
-            if isinstance(result, dict):
-
-                result_text = result.get(
-                    "text",
-                    result.get(
-                        "content",
-                        ""
-                    )
-                )
-
-                if result_text:
-                    evidence_parts.append(
-                        result_text
-                    )
-
-            else:
-                evidence_parts.append(
-                    str(result)
-                )
-
-        document_evidence = (
-            "\n\n".join(
-                evidence_parts
-            )
-        )
-
-        # Ask The Fix using information from the selected document.
-        answer = ask_ollama(
-            user_message=request.question,
-            document_evidence=document_evidence
-        )
-
-        return {
-            "success": True,
-            "question": request.question,
-            "document": safe_filename,
-            "answer": answer,
-            "results": results
-        }
-
-    except HTTPException:
-        raise
-
-    except Exception as error:
-
-        raise HTTPException(
-            status_code=500,
-            detail=str(error)
-        )
 # ============================================================
-# DIRECT START
+# START SERVER
 # ============================================================
 
 if __name__ == "__main__":
 
     import uvicorn
 
+    print("=" * 60)
+    print("THE FIX")
+    print(f"Version: {APP_VERSION}")
+    print("=" * 60)
+    print(f"Fast model:     {FAST_MODEL}")
+    print(f"Powerful model: {POWERFUL_MODEL}")
+    print(f"Vision model:   {VISION_MODEL}")
+    print(f"isiZulu model:  {MORENA_MODEL}")
+    print("Math engine:    SymPy 1.14.0")
+    print("=" * 60)
+    print("Speed optimization: ENABLED")
+    print("Response optimization: ENABLED")
+    print("Anti-repetition: ENABLED")
+    print("Automatic language detection: ENABLED")
+    print("Greeting optimization: ENABLED")
+    print("Advanced mathematics: ENABLED")
+    print("Fast model keep-alive: 2h")
+    print("MORENA keep-alive: 2h")
+    print("=" * 60)
+    print("Starting The Fix API...")
+    print("=" * 60)
 
     uvicorn.run(
-
-        "main:app",
-
+        app,
         host="127.0.0.1",
-
-        port=8000,
-
-        reload=False
+        port=8000
     )
