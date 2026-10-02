@@ -4,13 +4,13 @@ import re
 import requests
 from pathlib import Path
 
-from math_engine import solve_math
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
+from math_engine import solve_math
 from vision import router as vision_router
 
 from users import (
@@ -60,31 +60,128 @@ load_dotenv()
 # ============================================================
 
 APP_NAME = "The Fix"
-APP_VERSION = "11.3.0"
+APP_VERSION = "11.4.0"
 
-OLLAMA_URL = "http://127.0.0.1:11434/api/chat"
-OLLAMA_TAGS_URL = "http://127.0.0.1:11434/api/tags"
+
+# ============================================================
+# OLLAMA CONFIGURATION
+# ============================================================
+
+# Local default:
+# http://127.0.0.1:11434
+#
+# For Railway/public deployment:
+# Set OLLAMA_BASE_URL or OLLAMA_URL in Railway Variables.
+#
+# Example:
+# OLLAMA_BASE_URL=http://your-remote-ollama-server:11434
+#
+# If OLLAMA_URL is supplied directly, it may be:
+# http://127.0.0.1:11434/api/chat
+
+
+DEFAULT_OLLAMA_BASE_URL = "http://127.0.0.1:11434"
+
+OLLAMA_BASE_URL = os.getenv(
+    "OLLAMA_BASE_URL",
+    DEFAULT_OLLAMA_BASE_URL
+).strip().rstrip("/")
+
+OLLAMA_URL = os.getenv(
+    "OLLAMA_URL",
+    f"{OLLAMA_BASE_URL}/api/chat"
+).strip()
+
+if not OLLAMA_URL:
+    OLLAMA_URL = f"{OLLAMA_BASE_URL}/api/chat"
+
+
+# Build the Ollama tags URL safely.
+if OLLAMA_URL.endswith("/api/chat"):
+    OLLAMA_TAGS_URL = OLLAMA_URL[:-len("/api/chat")] + "/api/tags"
+else:
+    OLLAMA_TAGS_URL = os.getenv(
+        "OLLAMA_TAGS_URL",
+        f"{OLLAMA_BASE_URL}/api/tags"
+    ).strip()
+
+if not OLLAMA_TAGS_URL:
+    OLLAMA_TAGS_URL = f"{OLLAMA_BASE_URL}/api/tags"
 
 
 # ============================================================
 # MODELS
 # ============================================================
 
-FAST_MODEL = "qwen3:1.7b"
-POWERFUL_MODEL = "qwen3:4b"
-VISION_MODEL = "qwen3-vl:2b"
-MORENA_MODEL = "hf.co/vamboai/morena-1.5b-instruct-gguf:Q4_K_M"
+FAST_MODEL = os.getenv(
+    "FAST_MODEL",
+    "qwen3:1.7b"
+)
+
+POWERFUL_MODEL = os.getenv(
+    "POWERFUL_MODEL",
+    "qwen3:4b"
+)
+
+VISION_MODEL = os.getenv(
+    "VISION_MODEL",
+    "qwen3-vl:2b"
+)
+
+MORENA_MODEL = os.getenv(
+    "MORENA_MODEL",
+    "hf.co/vamboai/morena-1.5b-instruct-gguf:Q4_K_M"
+)
 
 OLLAMA_MODEL = FAST_MODEL
 
 
 # ============================================================
-# PERFORMANCE SETTINGS
+# PERFORMANCE
 # ============================================================
 
-FAST_KEEP_ALIVE = "2h"
-MORENA_KEEP_ALIVE = "2h"
-POWERFUL_KEEP_ALIVE = "30m"
+FAST_KEEP_ALIVE = os.getenv(
+    "FAST_KEEP_ALIVE",
+    "2h"
+)
+
+MORENA_KEEP_ALIVE = os.getenv(
+    "MORENA_KEEP_ALIVE",
+    "2h"
+)
+
+POWERFUL_KEEP_ALIVE = os.getenv(
+    "POWERFUL_KEEP_ALIVE",
+    "30m"
+)
+
+OLLAMA_CONNECT_TIMEOUT = float(
+    os.getenv(
+        "OLLAMA_CONNECT_TIMEOUT",
+        "3"
+    )
+)
+
+FAST_TIMEOUT = float(
+    os.getenv(
+        "FAST_TIMEOUT",
+        "35"
+    )
+)
+
+POWERFUL_TIMEOUT = float(
+    os.getenv(
+        "POWERFUL_TIMEOUT",
+        "120"
+    )
+)
+
+MORENA_TIMEOUT = float(
+    os.getenv(
+        "MORENA_TIMEOUT",
+        "60"
+    )
+)
 
 
 # ============================================================
@@ -93,6 +190,7 @@ POWERFUL_KEEP_ALIVE = "30m"
 
 _MODEL_CACHE = []
 _MODEL_CACHE_TIME = 0
+
 MODEL_CACHE_SECONDS = 60
 
 
@@ -313,15 +411,21 @@ def get_language_native_name(language):
 
 
 def is_multilingual_language(language):
-    return get_language_code(language) in MULTILINGUAL_LANGUAGES
+    return (
+        get_language_code(language)
+        in MULTILINGUAL_LANGUAGES
+    )
 
 
 def is_african_language(language):
-    return get_language_code(language) in AFRICAN_LANGUAGES
+    return (
+        get_language_code(language)
+        in AFRICAN_LANGUAGES
+    )
 
 
 # ============================================================
-# LIGHTWEIGHT LANGUAGE DETECTION
+# LANGUAGE DETECTION
 # ============================================================
 
 ENGLISH_GREETINGS = {
@@ -440,7 +544,10 @@ ZULU_MARKERS = {
 
 
 def normalize_for_language_detection(text):
-    text = safe_string(text).lower()
+
+    text = safe_string(
+        text
+    ).lower()
 
     text = re.sub(
         r"[^\w\s?'!-]",
@@ -458,7 +565,10 @@ def normalize_for_language_detection(text):
     return text
 
 
-def detect_input_language(message, requested_language):
+def detect_input_language(
+    message,
+    requested_language
+):
 
     requested = get_language_code(
         requested_language
@@ -485,16 +595,17 @@ def detect_input_language(message, requested_language):
         text.split()
     )
 
-    english_score = 0
-    zulu_score = 0
+    english_score = sum(
+        1
+        for word in words
+        if word in ENGLISH_MARKERS
+    )
 
-    for word in words:
-
-        if word in ENGLISH_MARKERS:
-            english_score += 1
-
-        if word in ZULU_MARKERS:
-            zulu_score += 1
+    zulu_score = sum(
+        1
+        for word in words
+        if word in ZULU_MARKERS
+    )
 
     if zulu_score >= 2 and zulu_score > english_score:
         return "zu-ZA"
@@ -531,7 +642,7 @@ def detect_input_language(message, requested_language):
 
 
 # ============================================================
-# SIMPLE GREETING DETECTION
+# GREETINGS
 # ============================================================
 
 def detect_greeting(message):
@@ -562,7 +673,53 @@ def greeting_response(language):
 
 
 # ============================================================
-# OLLAMA MODEL LIST
+# OLLAMA STATUS
+# ============================================================
+
+def check_ollama_connection():
+
+    start = time.time()
+
+    try:
+
+        response = requests.get(
+            OLLAMA_TAGS_URL,
+            timeout=OLLAMA_CONNECT_TIMEOUT
+        )
+
+        elapsed = round(
+            time.time() - start,
+            3
+        )
+
+        if response.status_code == 200:
+
+            return {
+                "connected": True,
+                "response_time": elapsed,
+                "status_code": response.status_code
+            }
+
+        return {
+            "connected": False,
+            "response_time": elapsed,
+            "status_code": response.status_code
+        }
+
+    except Exception as e:
+
+        return {
+            "connected": False,
+            "response_time": round(
+                time.time() - start,
+                3
+            ),
+            "error": str(e)
+        }
+
+
+# ============================================================
+# MODEL LIST
 # ============================================================
 
 def get_available_models(force=False):
@@ -575,7 +732,8 @@ def get_available_models(force=False):
     if (
         not force
         and _MODEL_CACHE
-        and now - _MODEL_CACHE_TIME < MODEL_CACHE_SECONDS
+        and now - _MODEL_CACHE_TIME
+        < MODEL_CACHE_SECONDS
     ):
         return _MODEL_CACHE
 
@@ -583,7 +741,7 @@ def get_available_models(force=False):
 
         response = requests.get(
             OLLAMA_TAGS_URL,
-            timeout=3
+            timeout=OLLAMA_CONNECT_TIMEOUT
         )
 
         if response.status_code != 200:
@@ -593,7 +751,10 @@ def get_available_models(force=False):
 
         models = [
             item.get("name")
-            for item in data.get("models", [])
+            for item in data.get(
+                "models",
+                []
+            )
             if item.get("name")
         ]
 
@@ -608,7 +769,10 @@ def get_available_models(force=False):
 
 
 def model_available(model_name):
-    return model_name in get_available_models()
+
+    models = get_available_models()
+
+    return model_name in models
 
 
 # ============================================================
@@ -617,7 +781,9 @@ def model_available(model_name):
 
 def is_complex_request(message):
 
-    text = safe_string(message).lower()
+    text = safe_string(
+        message
+    ).lower()
 
     complex_phrases = [
         "explain in detail",
@@ -631,6 +797,9 @@ def is_complex_request(message):
         "calculate",
         "solve",
         "derive",
+        "differentiate",
+        "integration",
+        "integrate",
         "prove",
         "equation",
         "mathematics",
@@ -684,16 +853,28 @@ def choose_model(
         language
     )
 
+    # isiZulu first
     if language_code == "zu-ZA":
 
         if model_available(MORENA_MODEL):
-            return MORENA_MODEL, "morena-isizulu"
+            return (
+                MORENA_MODEL,
+                "morena-isizulu"
+            )
 
         if model_available(FAST_MODEL):
-            return FAST_MODEL, "isizulu-fallback"
+            return (
+                FAST_MODEL,
+                "isizulu-fallback"
+            )
 
-        return POWERFUL_MODEL, "isizulu-fallback"
+        return (
+            POWERFUL_MODEL,
+            "isizulu-fallback"
+        )
 
+    # Documents and web information need
+    # the stronger model.
     if has_document or has_web:
 
         if model_available(POWERFUL_MODEL):
@@ -701,12 +882,22 @@ def choose_model(
             if is_multilingual_language(
                 language_code
             ):
-                return POWERFUL_MODEL, "multilingual-powerful"
+                return (
+                    POWERFUL_MODEL,
+                    "multilingual-powerful"
+                )
 
-            return POWERFUL_MODEL, "powerful"
+            return (
+                POWERFUL_MODEL,
+                "powerful"
+            )
 
-        return FAST_MODEL, "fast"
+        return (
+            FAST_MODEL,
+            "fast"
+        )
 
+    # Complex requests.
     if is_complex_request(
         user_message
     ):
@@ -716,18 +907,34 @@ def choose_model(
             if is_multilingual_language(
                 language_code
             ):
-                return POWERFUL_MODEL, "multilingual-powerful"
+                return (
+                    POWERFUL_MODEL,
+                    "multilingual-powerful"
+                )
 
-            return POWERFUL_MODEL, "powerful"
+            return (
+                POWERFUL_MODEL,
+                "powerful"
+            )
 
-        return FAST_MODEL, "fast"
+        return (
+            FAST_MODEL,
+            "fast"
+        )
 
+    # Normal multilingual requests.
     if is_multilingual_language(
         language_code
     ):
-        return FAST_MODEL, "multilingual-fast"
+        return (
+            FAST_MODEL,
+            "multilingual-fast"
+        )
 
-    return FAST_MODEL, "fast"
+    return (
+        FAST_MODEL,
+        "fast"
+    )
 
 
 # ============================================================
@@ -776,33 +983,34 @@ def get_conversation_context(user_id):
 
             for item in recent:
 
-                if isinstance(
+                if not isinstance(
                     item,
                     dict
                 ):
+                    continue
 
-                    role = item.get(
-                        "role",
+                role = item.get(
+                    "role",
+                    ""
+                )
+
+                content = item.get(
+                    "content",
+                    item.get(
+                        "message",
                         ""
                     )
+                )
 
-                    content = item.get(
-                        "content",
-                        item.get(
-                            "message",
-                            ""
-                        )
+                if content:
+
+                    content = str(
+                        content
+                    )[:1000]
+
+                    lines.append(
+                        f"{role}: {content}"
                     )
-
-                    if content:
-
-                        content = str(
-                            content
-                        )[:1000]
-
-                        lines.append(
-                            f"{role}: {content}"
-                        )
 
             return "\n".join(
                 lines
@@ -891,33 +1099,35 @@ def detect_and_save_memory(
             re.IGNORECASE
         )
 
-        if match:
+        if not match:
+            continue
 
-            value = match.group(
-                1
-            ).strip()
+        value = match.group(
+            1
+        ).strip()
 
-            value = re.sub(
-                r"[.!?]+$",
-                "",
+        value = re.sub(
+            r"[.!?]+$",
+            "",
+            value
+        ).strip()
+
+        if not value:
+            continue
+
+        try:
+
+            remember(
+                user_id,
+                key,
                 value
-            ).strip()
+            )
 
-            if value:
+            return True
 
-                try:
+        except Exception:
 
-                    remember(
-                        user_id,
-                        key,
-                        value
-                    )
-
-                    return True
-
-                except Exception:
-
-                    return False
+            return False
 
     return False
 
@@ -982,8 +1192,8 @@ Answer in the same language as the user's message.
 
 Do not unnecessarily switch to English.
 
-Do not translate the user's question unless the user asks
-for translation.
+Do not translate the user's question unless
+the user asks for translation.
 
 Do not repeat the user's question.
 
@@ -992,7 +1202,7 @@ Give the actual answer.
 
 
 # ============================================================
-# RESPONSE CLEANING / ANTI-REPETITION
+# RESPONSE CLEANING
 # ============================================================
 
 def clean_repeated_response(answer):
@@ -1106,49 +1316,6 @@ def clean_repeated_response(answer):
         final_sentences
     ).strip()
 
-    words = answer.split()
-
-    if len(words) >= 30:
-
-        max_block = min(
-            20,
-            len(words) // 2
-        )
-
-        for size in range(
-            5,
-            max_block + 1
-        ):
-
-            first = [
-                re.sub(
-                    r"[^\w]",
-                    "",
-                    word.lower()
-                )
-                for word in words[:size]
-            ]
-
-            second = [
-                re.sub(
-                    r"[^\w]",
-                    "",
-                    word.lower()
-                )
-                for word in words[size:size * 2]
-            ]
-
-            if (
-                first
-                and first == second
-            ):
-
-                answer = " ".join(
-                    words[:size]
-                ).strip()
-
-                break
-
     return answer
 
 
@@ -1257,15 +1424,11 @@ English technical terms may be used when necessary.
 
     if memory_context:
 
-        memory_text = str(
-            memory_context
-        )[:2000]
-
         messages.append({
             "role": "system",
             "content": (
                 "Relevant memory:\n"
-                + memory_text
+                + str(memory_context)[:2000]
             )
         })
 
@@ -1275,35 +1438,27 @@ English technical terms may be used when necessary.
             "role": "system",
             "content": (
                 "Recent conversation:\n"
-                + conversation_context
+                + str(conversation_context)[:4000]
             )
         })
 
     if document_context:
 
-        document_text = str(
-            document_context
-        )[:5000]
-
         messages.append({
             "role": "system",
             "content": (
                 "Relevant document information:\n"
-                + document_text
+                + str(document_context)[:5000]
             )
         })
 
     if web_context:
 
-        web_text = str(
-            web_context
-        )[:5000]
-
         messages.append({
             "role": "system",
             "content": (
                 "Relevant current web information:\n"
-                + web_text
+                + str(web_context)[:5000]
             )
         })
 
@@ -1325,9 +1480,8 @@ English technical terms may be used when necessary.
     if powerful:
 
         max_tokens = 280
-        request_timeout = 120
+        request_timeout = POWERFUL_TIMEOUT
         keep_alive = POWERFUL_KEEP_ALIVE
-
         temperature = 0.15
         repeat_penalty = 1.10
         repeat_last_n = 128
@@ -1335,9 +1489,8 @@ English technical terms may be used when necessary.
     elif morena:
 
         max_tokens = 150
-        request_timeout = 60
+        request_timeout = MORENA_TIMEOUT
         keep_alive = MORENA_KEEP_ALIVE
-
         temperature = 0.15
         repeat_penalty = 1.18
         repeat_last_n = 128
@@ -1345,9 +1498,8 @@ English technical terms may be used when necessary.
     else:
 
         max_tokens = 110
-        request_timeout = 35
+        request_timeout = FAST_TIMEOUT
         keep_alive = FAST_KEEP_ALIVE
-
         temperature = 0.15
         repeat_penalty = 1.10
         repeat_last_n = 128
@@ -1451,8 +1603,8 @@ English technical terms may be used when necessary.
 
         return (
             (
-                "The Fix cannot connect to Ollama. "
-                "Please make sure Ollama is running."
+                "The Fix cannot connect to the AI model server. "
+                "Please check the model server connection."
             ),
             selected_model,
             route,
@@ -1476,7 +1628,7 @@ English technical terms may be used when necessary.
 
 
 # ============================================================
-# ROOT + FRONTEND
+# ROOT
 # ============================================================
 
 @app.get("/")
@@ -1502,6 +1654,10 @@ def root():
     }
 
 
+# ============================================================
+# API
+# ============================================================
+
 @app.get("/api")
 def api_root():
 
@@ -1524,17 +1680,42 @@ def api_root():
 @app.get("/health")
 def health():
 
-    models = get_available_models(
-        force=True
-    )
+    ollama_status = check_ollama_connection()
+
+    models = []
+
+    if ollama_status.get(
+        "connected"
+    ):
+
+        models = get_available_models(
+            force=False
+        )
 
     return {
         "status": "online",
         "name": APP_NAME,
         "version": APP_VERSION,
-        "ollama": True,
+
+        "ollama": ollama_status.get(
+            "connected",
+            False
+        ),
+
+        "ollama_connected": ollama_status.get(
+            "connected",
+            False
+        ),
+
+        "ollama_url": OLLAMA_URL,
+
+        "ollama_response_time": ollama_status.get(
+            "response_time"
+        ),
+
         "math_engine": True,
         "math_engine_name": "SymPy 1.14.0",
+
         "available_models": models,
 
         "fast_model": FAST_MODEL,
@@ -1542,10 +1723,21 @@ def health():
         "vision_model": VISION_MODEL,
         "morena_model": MORENA_MODEL,
 
-        "fast_available": FAST_MODEL in models,
-        "powerful_available": POWERFUL_MODEL in models,
-        "vision_available": VISION_MODEL in models,
-        "morena_available": MORENA_MODEL in models
+        "fast_available": (
+            FAST_MODEL in models
+        ),
+
+        "powerful_available": (
+            POWERFUL_MODEL in models
+        ),
+
+        "vision_available": (
+            VISION_MODEL in models
+        ),
+
+        "morena_available": (
+            MORENA_MODEL in models
+        )
     }
 
 
@@ -1556,12 +1748,25 @@ def health():
 @app.get("/models")
 def models():
 
-    available = get_available_models(
-        force=True
-    )
+    status = check_ollama_connection()
+
+    available = []
+
+    if status.get(
+        "connected"
+    ):
+
+        available = get_available_models(
+            force=True
+        )
 
     return {
         "success": True,
+
+        "ollama_connected": status.get(
+            "connected",
+            False
+        ),
 
         "fast_model": FAST_MODEL,
         "powerful_model": POWERFUL_MODEL,
@@ -1570,10 +1775,21 @@ def models():
 
         "available_models": available,
 
-        "fast_available": FAST_MODEL in available,
-        "powerful_available": POWERFUL_MODEL in available,
-        "vision_available": VISION_MODEL in available,
-        "morena_available": MORENA_MODEL in available
+        "fast_available": (
+            FAST_MODEL in available
+        ),
+
+        "powerful_available": (
+            POWERFUL_MODEL in available
+        ),
+
+        "vision_available": (
+            VISION_MODEL in available
+        ),
+
+        "morena_available": (
+            MORENA_MODEL in available
+        )
     }
 
 
@@ -1904,13 +2120,65 @@ def chat(
         )
 
     # ========================================================
-    # AUTOMATIC INPUT LANGUAGE DETECTION
+    # LANGUAGE
     # ========================================================
 
     language = detect_input_language(
         message,
         requested_language
     )
+
+    # ========================================================
+    # GREETING FIRST
+    #
+    # This MUST happen before mathematics.
+    # ========================================================
+
+    greeting = detect_greeting(
+        message
+    )
+
+    if greeting:
+
+        answer = greeting_response(
+            language
+        )
+
+        try:
+
+            add_conversation(
+                user_id,
+                message,
+                answer
+            )
+
+        except Exception:
+            pass
+
+        return {
+            "name": APP_NAME,
+            "version": APP_VERSION,
+            "user_id": user_id,
+            "message": message,
+            "language": language,
+            "language_name": get_language_name(
+                language
+            ),
+            "language_native_name": get_language_native_name(
+                language
+            ),
+            "engine": "The Fix",
+            "model": "local-response",
+            "route": "greeting",
+            "web_search": False,
+            "memory_saved": False,
+            "model_response_time": 0.0,
+            "total_response_time": round(
+                time.time() - start_time,
+                3
+            ),
+            "answer": answer
+        }
 
     # ========================================================
     # BASIC CALCULATOR
@@ -1967,7 +2235,7 @@ def chat(
         pass
 
     # ========================================================
-    # ADVANCED MATHEMATICS ENGINE
+    # ADVANCED MATHEMATICS
     # ========================================================
 
     try:
@@ -2048,56 +2316,6 @@ def chat(
         pass
 
     # ========================================================
-    # GREETINGS
-    # ========================================================
-
-    greeting = detect_greeting(
-        message
-    )
-
-    if greeting:
-
-        answer = greeting_response(
-            language
-        )
-
-        try:
-
-            add_conversation(
-                user_id,
-                message,
-                answer
-            )
-
-        except Exception:
-            pass
-
-        return {
-            "name": APP_NAME,
-            "version": APP_VERSION,
-            "user_id": user_id,
-            "message": message,
-            "language": language,
-            "language_name": get_language_name(
-                language
-            ),
-            "language_native_name": get_language_native_name(
-                language
-            ),
-            "engine": "The Fix",
-            "model": "local-response",
-            "route": "greeting",
-            "web_search": False,
-            "memory_saved": False,
-            "model_response_time": 0.0,
-            "total_response_time": round(
-                time.time() - start_time,
-                3
-            ),
-            "answer": answer
-        }
-
-    # ========================================================
     # MEMORY
     # ========================================================
 
@@ -2164,7 +2382,7 @@ def chat(
             web_context = ""
 
     # ========================================================
-    # ASK MODEL
+    # MODEL
     # ========================================================
 
     answer, selected_model, route, model_time = ask_ollama(
@@ -2248,7 +2466,7 @@ def chat(
             answer += source_text
 
     # ========================================================
-    # FINAL CLEANUP
+    # CLEAN
     # ========================================================
 
     answer = clean_repeated_response(
@@ -2256,7 +2474,7 @@ def chat(
     )
 
     # ========================================================
-    # SAVE CONVERSATION
+    # SAVE
     # ========================================================
 
     try:
@@ -2713,30 +2931,53 @@ if __name__ == "__main__":
 
     import uvicorn
 
+    host = os.getenv(
+        "HOST",
+        "127.0.0.1"
+    )
+
+    port = int(
+        os.getenv(
+            "PORT",
+            "8000"
+        )
+    )
+
     print("=" * 60)
     print("THE FIX")
     print(f"Version: {APP_VERSION}")
     print("=" * 60)
-    print(f"Fast model:     {FAST_MODEL}")
-    print(f"Powerful model: {POWERFUL_MODEL}")
-    print(f"Vision model:   {VISION_MODEL}")
-    print(f"isiZulu model:  {MORENA_MODEL}")
-    print("Math engine:    SymPy 1.14.0")
+
+    print(f"Fast model:       {FAST_MODEL}")
+    print(f"Powerful model:   {POWERFUL_MODEL}")
+    print(f"Vision model:     {VISION_MODEL}")
+    print(f"isiZulu model:    {MORENA_MODEL}")
+
     print("=" * 60)
+
+    print("Math engine:      SymPy 1.14.0")
     print("Speed optimization: ENABLED")
-    print("Response optimization: ENABLED")
-    print("Anti-repetition: ENABLED")
-    print("Automatic language detection: ENABLED")
-    print("Greeting optimization: ENABLED")
-    print("Advanced mathematics: ENABLED")
-    print("Fast model keep-alive: 2h")
-    print("MORENA keep-alive: 2h")
+    print("Anti-repetition:    ENABLED")
+    print("Language detection: ENABLED")
+    print("Greeting routing:   ENABLED")
+    print("Advanced math:      ENABLED")
+    print("Memory:             ENABLED")
+    print("Documents:          ENABLED")
+    print("Vision:             ENABLED")
+
+    print("=" * 60)
+
+    print(f"Ollama URL:       {OLLAMA_URL}")
+    print(f"Ollama Tags URL:  {OLLAMA_TAGS_URL}")
+    print(f"Server host:      {host}")
+    print(f"Server port:      {port}")
+
     print("=" * 60)
     print("Starting The Fix API...")
     print("=" * 60)
 
     uvicorn.run(
         app,
-        host="127.0.0.1",
-        port=8000
+        host=host,
+        port=port
     )
